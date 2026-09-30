@@ -1,350 +1,206 @@
-# =====================================================
-# PROJECT 06 - Abalone Age Estimation using K-NN Regression
-# Theo yêu cầu môn Học máy - Bài 2
-# =====================================================
+"""Master pipeline orchestrator for Abalone Age Estimation Project.
 
-import os
-import math
+Orchestrates data processing, EDA, baseline modeling, hyperparameter search,
+model ablation (scaled vs. unscaled), test evaluation, and artifact generation.
+"""
+
+import argparse
+import sys
 # pyrefly: ignore [missing-import]
-import joblib
+import numpy as np
 import pandas as pd
-# pyrefly: ignore [missing-import]
-import matplotlib.pyplot as plt
 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-
-from sklearn.linear_model import LinearRegression
-from sklearn.neighbors import KNeighborsRegressor
-
-from sklearn.metrics import (
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score
+from src.data import load_data, check_data_quality, split_data
+from src.features import build_knn_pipeline
+from src.train import (
+    train_baseline_median,
+    cross_validate_knn,
+    select_best_hyperparameters,
+    train_final_model,
+    save_model_pipeline,
+    save_cv_results,
+)
+from src.evaluate import (
+    calculate_metrics,
+    analyze_errors_by_age_group,
+    plot_eda_figures,
+    plot_mae_vs_k,
+    plot_model_comparison,
+    plot_actual_vs_predicted,
+    plot_residuals,
+    save_evaluation_tables,
 )
 
-# =====================================================
-# Tạo thư mục lưu kết quả
-# =====================================================
-
-os.makedirs("models", exist_ok=True)
-os.makedirs("reports/figures", exist_ok=True)
-
-# =====================================================
-# BƯỚC 1 - Đọc dữ liệu
-# =====================================================
-
-columns = [
-    "Sex",
-    "Length",
-    "Diameter",
-    "Height",
-    "Whole_weight",
-    "Shucked_weight",
-    "Viscera_weight",
-    "Shell_weight",
-    "Rings"
-]
-
-df = pd.read_csv(
-    "data/raw/abalone.data",
-    header=None,
-    names=columns
-)
-
-print("=" * 60)
-print("THÔNG TIN DỮ LIỆU")
-print("=" * 60)
 
-print("Kích thước:", df.shape)
-print(df.head())
-
-print("\nKiểu dữ liệu:")
-df.info()
-
-# =====================================================
-# BƯỚC 2 - Khám phá dữ liệu (EDA)
-# =====================================================
-
-print("\nGiá trị thiếu:")
-print(df.isnull().sum())
-
-print("\nPhân bố giới tính:")
-print(df["Sex"].value_counts())
-
-plt.figure(figsize=(8,5))
-plt.hist(df["Rings"], bins=20)
-plt.title("Distribution of Rings")
-plt.xlabel("Rings")
-plt.ylabel("Count")
-
-plt.savefig(
-    "reports/figures/rings_distribution.png",
-    dpi=300,
-    bbox_inches="tight"
-)
-
-plt.show()
-plt.close()
-
-# =====================================================
-# BƯỚC 3 - Tiền xử lý
-# =====================================================
-
-df = pd.get_dummies(df, columns=["Sex"], dtype=int)
-
-X = df.drop(columns=["Rings"])
-y = df["Rings"]
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42
-)
-
-print("\nTrain:", X_train.shape)
-print("Test :", X_test.shape)
-
-# =====================================================
-# BƯỚC 4 - Baseline: Linear Regression
-# =====================================================
-
-baseline = LinearRegression()
-baseline.fit(X_train, y_train)
-
-baseline_pred = baseline.predict(X_test)
-
-baseline_mae = mean_absolute_error(y_test, baseline_pred)
-baseline_rmse = math.sqrt(mean_squared_error(y_test, baseline_pred))
-baseline_r2 = r2_score(y_test, baseline_pred)
-
-print("\nBaseline - Linear Regression")
-print(f"MAE : {baseline_mae:.3f}")
-print(f"RMSE: {baseline_rmse:.3f}")
-print(f"R²  : {baseline_r2:.3f}")
-
-# =====================================================
-# BƯỚC 5 - KNN KHÔNG SCALE
-# =====================================================
-
-knn = KNeighborsRegressor(n_neighbors=5)
-knn.fit(X_train, y_train)
-
-pred = knn.predict(X_test)
-
-knn_mae = mean_absolute_error(y_test, pred)
-knn_rmse = math.sqrt(mean_squared_error(y_test, pred))
-knn_r2 = r2_score(y_test, pred)
-
-print("\nKNN (Không Scale)")
-print(f"MAE : {knn_mae:.3f}")
-print(f"RMSE: {knn_rmse:.3f}")
-print(f"R²  : {knn_r2:.3f}")
-
-# =====================================================
-# BƯỚC 6 - KNN CÓ STANDARD SCALER
-# =====================================================
-
-pipeline = Pipeline([
-    ("scaler", StandardScaler()),
-    ("knn", KNeighborsRegressor(n_neighbors=5))
-])
-
-pipeline.fit(X_train, y_train)
-
-scaled_pred = pipeline.predict(X_test)
-
-scaled_mae = mean_absolute_error(y_test, scaled_pred)
-scaled_rmse = math.sqrt(mean_squared_error(y_test, scaled_pred))
-scaled_r2 = r2_score(y_test, scaled_pred)
-
-print("\nKNN (Có StandardScaler)")
-print(f"MAE : {scaled_mae:.3f}")
-print(f"RMSE: {scaled_rmse:.3f}")
-print(f"R²  : {scaled_r2:.3f}")
-
-# =====================================================
-# BƯỚC 7 - MAE theo K
-# =====================================================
-
-k_values = range(1,31)
-mae_values = []
-
-for k in k_values:
-
-    model = Pipeline([
-        ("scaler", StandardScaler()),
-        ("knn", KNeighborsRegressor(n_neighbors=k))
-    ])
-
-    model.fit(X_train, y_train)
-
-    pred = model.predict(X_test)
-
-    mae = mean_absolute_error(y_test, pred)
-
-    mae_values.append(mae)
-
-best_k = k_values[mae_values.index(min(mae_values))]
-
-print(f"\nBest K = {best_k}")
-
-plt.figure(figsize=(8,5))
-plt.plot(k_values, mae_values, marker="o")
-plt.xticks(k_values)
-plt.grid(True)
-
-plt.title("MAE theo K")
-plt.xlabel("K")
-plt.ylabel("MAE")
-
-plt.savefig(
-    "reports/figures/mae_vs_k.png",
-    dpi=300,
-    bbox_inches="tight"
-)
-
-plt.show()
-plt.close()
-
-# =====================================================
-# BƯỚC 8 - Huấn luyện lại với Best K
-# =====================================================
-
-best_pipeline = Pipeline([
-    ("scaler", StandardScaler()),
-    ("knn", KNeighborsRegressor(n_neighbors=best_k))
-])
-
-best_pipeline.fit(X_train, y_train)
-
-best_pred = best_pipeline.predict(X_test)
-
-best_mae = mean_absolute_error(y_test, best_pred)
-best_rmse = math.sqrt(mean_squared_error(y_test, best_pred))
-best_r2 = r2_score(y_test, best_pred)
-
-print("\nKNN Tốt Nhất")
-print(f"K    : {best_k}")
-print(f"MAE  : {best_mae:.3f}")
-print(f"RMSE : {best_rmse:.3f}")
-print(f"R²   : {best_r2:.3f}")
-
-# =====================================================
-# BƯỚC 9 - So sánh mô hình
-# =====================================================
-
-results = pd.DataFrame({
-    "Model":[
-        "Linear Regression",
-        "KNN",
-        "KNN + StandardScaler",
-        f"KNN Best(K={best_k})"
-    ],
-    "MAE":[
-        baseline_mae,
-        knn_mae,
-        scaled_mae,
-        best_mae
-    ],
-    "RMSE":[
-        baseline_rmse,
-        knn_rmse,
-        scaled_rmse,
-        best_rmse
-    ],
-    "R2":[
-        baseline_r2,
-        knn_r2,
-        scaled_r2,
-        best_r2
-    ]
-})
-
-print("\n============================")
-print("BẢNG SO SÁNH")
-print("============================")
-print(results.round(3))
-
-plt.figure(figsize=(8,5))
-plt.bar(results["Model"], results["R2"])
-plt.ylim(0,1)
-plt.ylabel("R²")
-plt.title("Model Comparison")
-
-plt.savefig(
-    "reports/figures/model_comparison.png",
-    dpi=300,
-    bbox_inches="tight"
-)
-
-plt.show()
-plt.close()
-
-# =====================================================
-# BƯỚC 10 - Phân tích lỗi theo nhóm tuổi
-# =====================================================
-
-error_df = pd.DataFrame({
-    "Actual": y_test.values,
-    "Predicted": best_pred
-})
-
-error_df["AgeGroup"] = pd.cut(
-    error_df["Actual"],
-    bins=[0,8,12,30],
-    labels=["Young","Middle","Old"]
-)
-
-print("\nMAE theo nhóm tuổi")
-
-group_mae = error_df.groupby("AgeGroup").apply(
-    lambda x: mean_absolute_error(x["Actual"], x["Predicted"])
-)
-
-print(group_mae)
-
-# =====================================================
-# BƯỚC 11 - Actual vs Predicted
-# =====================================================
-
-plt.figure(figsize=(6,6))
-
-plt.scatter(
-    y_test,
-    best_pred,
-    alpha=0.5
-)
-
-plt.plot(
-    [y_test.min(), y_test.max()],
-    [y_test.min(), y_test.max()],
-    "r--"
-)
-
-plt.xlabel("Actual Rings")
-plt.ylabel("Predicted Rings")
-plt.title("Actual vs Predicted")
-
-plt.savefig(
-    "reports/figures/actual_vs_predicted.png",
-    dpi=300,
-    bbox_inches="tight"
-)
-
-plt.show()
-plt.close()
-
-# =====================================================
-# BƯỚC 12 - Lưu Pipeline
-# =====================================================
-
-joblib.dump(
-    best_pipeline,
-    "models/abalone_knn_pipeline.pkl"
-)
-
-print("\nPipeline đã lưu:")
-print("models/abalone_knn_pipeline.pkl")
+def run_pipeline(
+    data_path: str = "data/raw/abalone.data",
+    test_size: float = 0.2,
+    random_state: int = 42,
+    cv_folds: int = 5,
+    skip_eda: bool = False,
+) -> None:
+    """Execute the full end-to-end Machine Learning pipeline."""
+    print("=" * 75)
+    print(" PROJECT 06 - ABALONE AGE ESTIMATION (K-NN REGRESSION)")
+    print("=" * 75)
+
+    # 1. Load Data
+    print("\n[1/7] Loading dataset and verifying schema...")
+    df = load_data(data_path)
+    quality = check_data_quality(df)
+    print(f"  ✓ Total observations: {quality['num_rows']}, Columns: {quality['num_columns']}")
+    print(f"  ✓ Missing values    : {sum(quality['missing_values'].values())}")
+    print(f"  ✓ Duplicate rows    : {quality['duplicate_rows']}")
+
+    # 2. Split Data (Strict Leakage Prevention)
+    print("\n[2/7] Splitting data into Train (80%) and Test (20%)...")
+    X_train, X_test, y_train, y_test = split_data(
+        df,
+        test_size=test_size,
+        random_state=random_state,
+    )
+    print(f"  ✓ Train size: {X_train.shape[0]} samples")
+    print(f"  ✓ Test size : {X_test.shape[0]} samples")
+
+    # 3. Exploratory Data Analysis (Only on Train)
+    if not skip_eda:
+        print("\n[3/7] Generating EDA figures on Training set...")
+        plot_eda_figures(X_train, y_train, output_dir="reports/figures")
+        print("  ✓ Saved EDA figures to reports/figures/")
+    else:
+        print("\n[3/7] Skipping EDA generation (--skip-eda flag enabled).")
+
+    # 4. Baseline Modeling (Median of Train Rings)
+    print("\n[4/7] Evaluating Baseline (Median of Train Rings)...")
+    baseline_val = train_baseline_median(y_train)
+    baseline_pred = np.full(shape=len(y_test), fill_value=baseline_val)
+    baseline_metrics = calculate_metrics(y_test, baseline_pred)
+    print(f"  ✓ Median Baseline value : {baseline_val:.2f}")
+    print(f"  ✓ Baseline Test MAE     : {baseline_metrics['MAE']:.3f}")
+    print(f"  ✓ Baseline Test RMSE    : {baseline_metrics['RMSE']:.3f}")
+    print(f"  ✓ Baseline Test R²      : {baseline_metrics['R2']:.3f}")
+
+    # 5. Cross-Validation on Training set (Hyperparameter Tuning)
+    print(f"\n[5/7] Running {cv_folds}-Fold Cross-Validation on Train (K=1..30, weights=uniform/distance)...")
+    cv_results_df = cross_validate_knn(
+        X_train,
+        y_train,
+        k_values=range(1, 31),
+        weights_list=["uniform", "distance"],
+        cv_folds=cv_folds,
+        random_state=random_state,
+    )
+    save_cv_results(cv_results_df, "reports/cv_results.csv")
+    plot_mae_vs_k(cv_results_df, "reports/figures/mae_vs_k.png")
+
+    best_config = select_best_hyperparameters(cv_results_df)
+    best_k = best_config["best_k"]
+    best_weights = best_config["best_weights"]
+    print(f"  ✓ Best Hyperparameters  : K = {best_k}, Weights = '{best_weights}'")
+    print(f"  ✓ Best CV MAE           : {best_config['best_cv_mae']:.4f} ± {best_config['best_cv_std']:.4f}")
+    print("  ✓ Saved reports/cv_results.csv and reports/figures/mae_vs_k.png")
+
+    # 6. Ablation Experiment: k-NN No Scale vs k-NN StandardScaler
+    print("\n[6/7] Running Ablation Experiment: Unscaled vs. StandardScaler...")
+    # Unscaled pipeline
+    unscaled_pipeline = build_knn_pipeline(n_neighbors=best_k, weights=best_weights, with_scaling=False)
+    unscaled_pipeline.fit(X_train, y_train)
+    unscaled_pred = unscaled_pipeline.predict(X_test)
+    unscaled_metrics = calculate_metrics(y_test, unscaled_pred)
+
+    # Scaled pipeline (Final Model)
+    final_pipeline = train_final_model(
+        X_train,
+        y_train,
+        n_neighbors=best_k,
+        weights=best_weights,
+        with_scaling=True,
+    )
+    final_pred = final_pipeline.predict(X_test)
+    final_metrics = calculate_metrics(y_test, final_pred)
+
+    # Save model artifact
+    save_model_pipeline(final_pipeline, "models/abalone_knn_pipeline.pkl")
+    print("  ✓ Saved model artifact to models/abalone_knn_pipeline.pkl")
+
+    # 7. Final Evaluation & Error Analysis
+    print("\n[7/7] Generating final evaluations and error analysis...")
+    results_df = pd.DataFrame(
+        [
+            {"Model": "Median Baseline", **baseline_metrics},
+            {"Model": "KNN - No Scale", **unscaled_metrics},
+            {"Model": "KNN - StandardScaler", **final_metrics},
+        ]
+    )
+
+    plot_model_comparison(results_df, "reports/figures/model_comparison.png")
+    plot_actual_vs_predicted(y_test, final_pred, "reports/figures/actual_vs_predicted.png")
+    plot_residuals(y_test, final_pred, "reports/figures/residual_plot.png")
+
+    group_mae = analyze_errors_by_age_group(y_test, final_pred)
+    save_evaluation_tables(results_df, group_mae, "reports")
+
+    # Summary Output
+    print("\n" + "=" * 75)
+    print(" SUMMARY OF EXPERIMENTAL RESULTS (TEST SET EVALUATION)")
+    print("=" * 75)
+    print(results_df.round(4).to_string(index=False))
+
+    print("\n" + "-" * 75)
+    print(" ERROR ANALYSIS ACROSS AGE GROUPS (MAE)")
+    print("-" * 75)
+    for group, mae in group_mae.items():
+        print(f"  • {group:8s} : MAE = {mae:.3f} rings")
+
+    print("\n" + "=" * 75)
+    print(" Pipeline completed successfully. All artifacts saved.")
+    print("=" * 75)
+
+
+def main():
+    """CLI entrypoint."""
+    parser = argparse.ArgumentParser(
+        description="Abalone Age Estimation using K-NN Regression Pipeline"
+    )
+    parser.add_argument(
+        "--data-path",
+        type=str,
+        default="data/raw/abalone.data",
+        help="Path to abalone raw data file (default: data/raw/abalone.data)",
+    )
+    parser.add_argument(
+        "--test-size",
+        type=float,
+        default=0.2,
+        help="Proportion of dataset for test split (default: 0.2)",
+    )
+    parser.add_argument(
+        "--random-state",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility (default: 42)",
+    )
+    parser.add_argument(
+        "--cv-folds",
+        type=int,
+        default=5,
+        help="Number of folds for Cross Validation (default: 5)",
+    )
+    parser.add_argument(
+        "--skip-eda",
+        action="store_true",
+        help="Skip generation of exploratory data figures",
+    )
+
+    args = parser.parse_args()
+    run_pipeline(
+        data_path=args.data_path,
+        test_size=args.test_size,
+        random_state=args.random_state,
+        cv_folds=args.cv_folds,
+        skip_eda=args.skip_eda,
+    )
+
+
+if __name__ == "__main__":
+    main()

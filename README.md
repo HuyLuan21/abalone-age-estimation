@@ -1,174 +1,103 @@
-# Data Processing Guide
+# Project 06: Ước lượng tuổi bào ngư bằng K-NN Regression
 
-Hướng dẫn cài đặt và chạy phần **xử lý dữ liệu** của dự án **Abalone Age Estimation using K-NN Regression**.
+Dự án học máy ước lượng tuổi của bào ngư (*Abalone*) thông qua các phép đo vật lý sử dụng thuật toán **K-Nearest Neighbors (k-NN) Regression**, tuân thủ nghiêm ngặt quy trình chống rò rỉ dữ liệu (data leakage) và quy chuẩn bài tập lớn.
 
-## Yêu cầu môi trường
+---
 
-- Python 3.14 hoặc mới hơn
-- Windows (PowerShell) _(có thể chạy trên Linux/macOS với lệnh tương đương)_
+## 📁 Cấu trúc thư mục mã nguồn
 
-## Cài đặt dự án
+Dự án được tái cấu trúc dạng **Modular** theo đúng khuyến nghị của đề bài:
 
-### 1. Di chuyển vào thư mục dự án
-
-```powershell
-cd ../abalone-age-estimation
+```text
+abalone-age-estimation/
+├── data/
+│   ├── README.md               # Mô tả nguồn gốc dữ liệu & DOI
+│   ├── data_dictionary.md      # Giải thích chi tiết các thuộc tính
+│   └── raw/
+│       ├── abalone.data        # Dữ liệu gốc UCI
+│       └── abalone.names       # Tài liệu gốc mô tả thuộc tính
+├── src/                        # Mã nguồn module hóa
+│   ├── __init__.py
+│   ├── data.py                 # Tải, kiểm tra chất lượng & chia Train/Test
+│   ├── features.py             # Xây dựng tiền xử lý & scikit-learn Pipeline
+│   ├── train.py                # K-Fold CV, chọn tham số & lưu Model
+│   └── evaluate.py             # Đánh giá metric, phân tích sai số & vẽ biểu đồ
+├── models/
+│   └── abalone_knn_pipeline.pkl# Pipeline k-NN đã huấn luyện hoàn chỉnh
+├── reports/
+│   ├── cv_results.csv          # Bảng kết quả 5-Fold Cross Validation
+│   ├── model_results.csv       # Bảng so sánh hiệu năng các mô hình
+│   ├── age_group_mae.csv       # Phân tích sai số theo nhóm tuổi
+│   └── figures/                # Biểu đồ phân tích EDA và đánh giá mô hình
+│       ├── rings_distribution.png
+│       ├── sex_distribution.png
+│       ├── mae_vs_k.png
+│       ├── model_comparison.png
+│       ├── actual_vs_predicted.png
+│       └── residual_plot.png
+├── app/                        # Ứng dụng Web & REST API
+├── main.py                     # Script điều phối toàn bộ quy trình
+├── requirements.txt            # Danh sách thư viện phụ thuộc
+└── README.md                   # Tài liệu hướng dẫn sử dụng
 ```
 
-### 2. Tạo môi trường ảo
+---
+
+## ⚙️ Cài đặt & Thiết lập môi trường
+
+### 1. Tạo và kích hoạt môi trường ảo
 
 ```powershell
+# Di chuyển vào thư mục dự án
+cd abalone-age-estimation
+
+# Tạo môi trường ảo (Python 3.10+)
 python -m venv venv
-```
 
-### 3. Kích hoạt môi trường ảo
-
-```powershell
+# Kích hoạt môi trường (Windows PowerShell)
 venv\Scripts\activate
 ```
 
-Sau khi kích hoạt thành công, đầu dòng lệnh sẽ xuất hiện `(venv)`.
-
-### 4. Cài đặt thư viện
-
-Dự án sử dụng các thư viện được khai báo trong `requirements.txt`.
+### 2. Cài đặt các thư viện phụ thuộc
 
 ```powershell
-python -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-Nội dung `requirements.txt`:
+---
 
-```text
-pandas
-matplotlib
-scikit-learn
-joblib
-streamlit
-```
+## 🚀 Hướng dẫn chạy
 
-## Cấu trúc dữ liệu
+### Chạy toàn bộ Pipeline (1-Click)
 
-```text
-data/
-├── README.md
-├── data_dictionary.md
-└── raw/
-    ├── abalone.data
-    └── abalone.names
-```
-
-- `abalone.data`: dữ liệu gốc từ UCI Machine Learning Repository.
-- `abalone.names`: tài liệu mô tả dataset.
-- `README.md`: mô tả nguồn dữ liệu.
-- `data_dictionary.md`: giải thích từng thuộc tính.
-
-## Cách chạy
-
-Thực hiện lệnh:
+Thực hiện lệnh sau để chạy toàn bộ quá trình (Load data → EDA → Baseline → CV chọn K → Thí nghiệm Scale → Test cuối → Xuất biểu đồ & bảng kết quả):
 
 ```powershell
 python main.py
 ```
 
-## Quy trình xử lý dữ liệu
-
-Chương trình sẽ thực hiện toàn bộ pipeline Machine Learning theo các bước sau:
-
-1. Đọc dữ liệu từ `data/raw/abalone.data`.
-2. Gán tên cho các cột.
-3. Kiểm tra kích thước và kiểu dữ liệu.
-4. Kiểm tra giá trị thiếu.
-5. Phân tích phân bố dữ liệu (`Sex`, `Rings`).
-6. Chuyển biến `Sex` thành dữ liệu số bằng One-Hot Encoding.
-7. Chia dữ liệu theo tỷ lệ 80% Train và 20% Test.
-8. Huấn luyện mô hình Baseline (Linear Regression).
-9. Huấn luyện k-NN Regression.
-10. So sánh k-NN trước và sau khi chuẩn hóa bằng `StandardScaler`.
-11. Tìm giá trị K tối ưu thông qua đồ thị MAE theo K.
-12. Đánh giá mô hình bằng MAE, RMSE và R².
-13. Phân tích sai số theo nhóm tuổi.
-14. Lưu Pipeline và các biểu đồ.
-
-## Kết quả đầu ra
-
-Sau khi chạy thành công, chương trình tạo các tệp sau.
-
-### Mô hình
-
-```text
-models/
-└── abalone_knn_pipeline.pkl
-```
-
-Pipeline đã huấn luyện được lưu bằng `joblib` để sử dụng cho ứng dụng web ở bước tiếp theo.
-
-### Biểu đồ
-
-```text
-reports/
-└── figures/
-    ├── rings_distribution.png
-    ├── mae_vs_k.png
-    ├── model_comparison.png
-    └── actual_vs_predicted.png
-```
-
-Ý nghĩa các biểu đồ:
-
-- **rings_distribution.png**: Phân bố số vòng của bào ngư.
-- **mae_vs_k.png**: Sai số MAE theo từng giá trị K.
-- **model_comparison.png**: So sánh hiệu năng giữa các mô hình.
-- **actual_vs_predicted.png**: So sánh giá trị dự đoán với giá trị thực tế.
-
-## Các chỉ số đánh giá
-
-Chương trình sử dụng ba chỉ số chính:
-
-| Chỉ số | Ý nghĩa                       |
-| ------ | ----------------------------- |
-| MAE    | Sai số tuyệt đối trung bình   |
-| RMSE   | Sai số căn bậc hai trung bình |
-| R²     | Hệ số xác định của mô hình    |
-
-Các chỉ số này được hiển thị trên terminal sau khi hoàn thành quá trình huấn luyện.
-
-## Khắc phục lỗi thường gặp
-
-### Không tìm thấy dataset
-
-Lỗi:
-
-```text
-FileNotFoundError: data/raw/abalone.data
-```
-
-Kiểm tra lại cấu trúc thư mục:
-
-```text
-data/
-└── raw/
-    └── abalone.data
-```
-
-### Thiếu thư viện
-
-Nếu xuất hiện lỗi `ModuleNotFoundError`, cài lại thư viện:
+### Chạy với các tùy chọn bổ sung:
 
 ```powershell
-python -m pip install -r requirements.txt
+# Bỏ qua tạo lại hình ảnh EDA (tăng tốc độ chạy)
+python main.py --skip-eda
+
+# Tùy chỉnh seed ngẫu nhiên hoặc số fold CV
+python main.py --random-state 42 --cv-folds 5
 ```
 
-### Sai Python Interpreter
-
-Kiểm tra interpreter đang sử dụng:
+### Chạy kiểm tra từng module độc lập:
 
 ```powershell
-python -c "import sys; print(sys.executable)"
+# Kiểm tra tải dữ liệu và phân chia tập
+python -m src.data
 ```
 
-Kết quả mong muốn:
+---
 
-```text
-...\abalone-age-estimation\venv\Scripts\python.exe
-```
+## 🔬 Các thí nghiệm bắt buộc & Kết quả
+
+1. **Thí nghiệm 1 (Baseline vs. k-NN):** Mô hình k-NN vượt trội hoàn toàn so với Median Baseline ($R^2 \approx 0.53$ vs $R^2 \approx -0.07$).
+2. **Thí nghiệm 2 (Có scale vs. Không scale):** Đánh giá tác động của `StandardScaler` lên khoảng cách Euclidean của k-NN.
+3. **Thí nghiệm 3 (Đồ thị MAE theo K):** Tìm được $K$ tối ưu thông qua 5-Fold CV trên tập huấn luyện (`reports/figures/mae_vs_k.png`).
+4. **Thí nghiệm 4 (Sai số theo nhóm tuổi):** Phân tích sự khác biệt MAE giữa các nhóm `Young` ($\le 8$), `Middle` ($9-12$), và `Old` ($> 12$).
