@@ -1,0 +1,61 @@
+# =========================
+# Python & Cache
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =========================
+# Virtual Environment
+# =========================
+venv/
+.venv/
+env/
+ENV/
+
+# =========================
+# Environment Variables & Secrets
+# =========================
+.env
+.env.local
+
+# =========================
+# Jupyter & Testing
+# =========================
+.ipynb_checkpoints/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Type Checker & Linters
+# =========================
+.mypy_cache/
+.pyrefly/
+
+# =========================
+# IDEs & Editors
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Build & Packaging
+# =========================
+build/
+dist/
+*.egg-info/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+*.log
