@@ -3,3 +3,7 @@ matplotlib
 scikit-learn
 joblib
 streamlit
+fastapi
+uvicorn
+pydantic
+httpx

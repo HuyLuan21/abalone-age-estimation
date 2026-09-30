@@ -95,6 +95,43 @@ python -m src.data
 
 ---
 
+## 🌐 Khởi chạy Backend API (FastAPI)
+
+### 1. Khởi động API Server (Chọn 1 trong các cách sau):
+
+- **Cách 1 (Ngắn gọn & Dễ nhớ nhất):**
+  ```powershell
+  python run_server.py
+  ```
+- **Cách 2:**
+  ```powershell
+  python app/api.py
+  ```
+- **Cách 3 (Dùng uvicorn CLI):**
+  ```powershell
+  uvicorn app.api:app --reload --port 8000
+  ```
+
+- **Swagger UI (Tài liệu API tương tác):** `http://127.0.0.1:8000/docs`
+- **ReDoc:** `http://127.0.0.1:8000/redoc`
+
+### 2. Các Endpoint API chính:
+
+| Phương thức | Endpoint | Mô tả |
+| :--- | :--- | :--- |
+| `GET` | `/api/health` | Kiểm tra trạng thái hoạt động của server và model |
+| `GET` | `/api/model-card` | Lấy siêu dữ liệu Model Card, chỉ số đánh giá, giới hạn |
+| `GET` | `/api/feature-ranges` | Lấy miền giá trị và thống kê các biến đầu vào |
+| `POST` | `/api/predict` | Dự đoán số vòng, tuổi, khoảng tham chiếu láng giềng & cảnh báo OOD |
+
+### 3. Chạy Unit Test kiểm thử API tự động:
+
+```powershell
+python -m app.test_api
+```
+
+---
+
 ## 🔬 Các thí nghiệm bắt buộc & Kết quả
 
 1. **Thí nghiệm 1 (Baseline vs. k-NN):** Mô hình k-NN vượt trội hoàn toàn so với Median Baseline ($R^2 \approx 0.53$ vs $R^2 \approx -0.07$).
