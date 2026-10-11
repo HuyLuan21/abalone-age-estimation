@@ -10,6 +10,12 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     print("=" * 70)
     print("🚀 Khởi động Abalone Age Estimation Backend API Server...")

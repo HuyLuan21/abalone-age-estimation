@@ -1,13 +1,24 @@
-"""Prediction service and OOD validation logic for Abalone Age Estimation."""
+"""Prediction service and OOD validation logic for Abalone Age Estimation.
 
+Handles dynamic metadata synchronization, k-NN inference, neighbor explanations,
+and domain consistency validation.
+"""
+
+import json
 import os
 import sys
+import warnings
 from typing import Dict, List, Tuple, Any
-# pyrefly: ignore [missing-import]
 import joblib
-# pyrefly: ignore [missing-import]
 import numpy as np
 import pandas as pd
+
+# Suppress minor cross-environment version warnings when loading pickle
+try:
+    from sklearn.exceptions import InconsistentVersionWarning
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except ImportError:
+    pass
 
 # Ensure project root is always in sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -36,10 +47,11 @@ except ModuleNotFoundError:
     )
 
 
-FEATURE_METADATA = {
+# Baseline fallback metadata (used if json/csv artifacts are not yet generated)
+DEFAULT_FEATURE_METADATA = {
     "Length": {
         "unit": "mm",
-        "desc": "Chiều dài lớn nhất của vỏ bào ngư",
+        "desc": "Chiều dài lớn nhất của vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
         "min": 0.075,
         "max": 0.815,
         "mean": 0.524,
@@ -47,7 +59,7 @@ FEATURE_METADATA = {
     },
     "Diameter": {
         "unit": "mm",
-        "desc": "Đường kính vỏ vuông góc với chiều dài",
+        "desc": "Đường kính vuông góc với chiều dài (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
         "min": 0.055,
         "max": 0.650,
         "mean": 0.408,
@@ -55,7 +67,7 @@ FEATURE_METADATA = {
     },
     "Height": {
         "unit": "mm",
-        "desc": "Chiều cao kèm thịt trong vỏ",
+        "desc": "Chiều cao kèm thịt trong vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
         "min": 0.010,
         "max": 0.300,
         "mean": 0.140,
@@ -63,7 +75,7 @@ FEATURE_METADATA = {
     },
     "Whole_weight": {
         "unit": "g",
-        "desc": "Tổng khối lượng nguyên con",
+        "desc": "Tổng khối lượng toàn bộ cá thể (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
         "min": 0.002,
         "max": 2.826,
         "mean": 0.829,
@@ -71,7 +83,7 @@ FEATURE_METADATA = {
     },
     "Shucked_weight": {
         "unit": "g",
-        "desc": "Khối lượng phần thịt bào ngư",
+        "desc": "Khối lượng phần thịt bào ngư (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
         "min": 0.001,
         "max": 1.488,
         "mean": 0.360,
@@ -79,7 +91,7 @@ FEATURE_METADATA = {
     },
     "Viscera_weight": {
         "unit": "g",
-        "desc": "Khối lượng nội tạng sau khi mổ",
+        "desc": "Khối lượng nội tạng sau khi mổ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
         "min": 0.001,
         "max": 0.760,
         "mean": 0.181,
@@ -87,7 +99,7 @@ FEATURE_METADATA = {
     },
     "Shell_weight": {
         "unit": "g",
-        "desc": "Khối lượng vỏ sấy khô",
+        "desc": "Khối lượng vỏ sấy khô (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
         "min": 0.002,
         "max": 1.005,
         "mean": 0.239,
@@ -97,13 +109,24 @@ FEATURE_METADATA = {
 
 
 class AbalonePredictor:
-    """Predictor service wrapping scikit-learn pipeline and domain validations."""
+    """Predictor service wrapping scikit-learn pipeline, dynamic metadata, and validations."""
 
-    def __init__(self, model_path: str = "models/abalone_knn_pipeline.pkl"):
-        """Initialize predictor and load saved pipeline."""
+    def __init__(
+        self,
+        model_path: str = "models/abalone_knn_pipeline.pkl",
+        metadata_path: str = "models/model_metadata.json",
+    ):
+        """Initialize predictor, load saved pipeline, and sync dynamic metadata."""
         self.model_path = model_path
+        self.metadata_path = metadata_path
         self.pipeline = None
+        self.metadata: Dict[str, Any] = {}
+        self.feature_stats: Dict[str, Dict[str, Any]] = DEFAULT_FEATURE_METADATA.copy()
+        self.total_training_samples: int = 3341
+        self.valid_sex_values: List[str] = ["M", "F", "I"]
+
         self._load_pipeline()
+        self._load_metadata()
 
     def _load_pipeline(self) -> None:
         """Load fitted Pipeline from disk."""
@@ -127,6 +150,80 @@ class AbalonePredictor:
 
         self.pipeline = joblib.load(found_path)
 
+    def _load_metadata(self) -> None:
+        """Dynamically load training configuration, statistics, and evaluation metrics."""
+        candidate_json_paths = [
+            self.metadata_path,
+            os.path.join(PROJECT_ROOT, self.metadata_path),
+            os.path.join(os.path.dirname(__file__), "..", self.metadata_path),
+        ]
+
+        loaded = False
+        for p in candidate_json_paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        self.metadata = json.load(f)
+                    loaded = True
+                    break
+                except Exception:
+                    pass
+
+        if loaded:
+            if "feature_statistics" in self.metadata:
+                self.feature_stats = self.metadata["feature_statistics"]
+            if "total_training_samples" in self.metadata:
+                self.total_training_samples = int(self.metadata["total_training_samples"])
+            if "valid_sex_values" in self.metadata:
+                self.valid_sex_values = list(self.metadata["valid_sex_values"])
+        else:
+            # Fallback: check CSV reports
+            self._load_metadata_from_csv_reports()
+
+    def _load_metadata_from_csv_reports(self) -> None:
+        """Fallback sync from CSV reports directory."""
+        reports_dir = os.path.join(PROJECT_ROOT, "reports")
+        age_csv = os.path.join(reports_dir, "age_group_mae.csv")
+        results_csv = os.path.join(reports_dir, "model_results.csv")
+
+        # 1. Sync age group MAE
+        if os.path.exists(age_csv):
+            try:
+                df_age = pd.read_csv(age_csv)
+                # First column is AgeGroup, second column is MAE
+                group_col = df_age.columns[0]
+                val_col = df_age.columns[1]
+                age_mae = {}
+                for _, row in df_age.iterrows():
+                    grp = str(row[group_col])
+                    val = round(float(row[val_col]), 4)
+                    if grp == "Young":
+                        age_mae["Young (<=8 rings)"] = val
+                    elif grp == "Middle":
+                        age_mae["Middle (9-12 rings)"] = val
+                    elif grp == "Old":
+                        age_mae["Old (>12 rings)"] = val
+                self.metadata["age_group_mae"] = age_mae
+            except Exception:
+                pass
+
+        # 2. Sync test performance metrics
+        if os.path.exists(results_csv):
+            try:
+                df_res = pd.read_csv(results_csv)
+                perf = {}
+                for _, row in df_res.iterrows():
+                    m_name = str(row["Model"])
+                    if "StandardScaler" in m_name:
+                        perf["Test_MAE"] = round(float(row["MAE"]), 4)
+                        perf["Test_RMSE"] = round(float(row["RMSE"]), 4)
+                        perf["Test_R2"] = round(float(row["R2"]), 4)
+                    elif "Baseline" in m_name:
+                        perf["Baseline_Median_MAE"] = round(float(row["MAE"]), 4)
+                self.metadata["performance_metrics"] = perf
+            except Exception:
+                pass
+
     def check_out_of_distribution(self, data: AbaloneInput) -> Tuple[bool, List[str]]:
         """Identify Out-of-Distribution (OOD) or biologically unusual samples.
 
@@ -136,24 +233,28 @@ class AbalonePredictor:
         Returns:
             Tuple[bool, List[str]]: (is_ood flag, list of descriptive warning messages).
         """
-        warnings = []
+        warnings_list = []
         is_ood = False
 
-        # 1. Check feature domain bounds
-        for feat, meta in FEATURE_METADATA.items():
-            val = getattr(data, feat)
-            if val < meta["min"] or val > meta["max"]:
-                is_ood = True
-                warnings.append(
-                    f"Giá trị {feat}={val}{meta['unit']} nằm ngoài phạm vi quan sát trong tập huấn luyện "
-                    f"[{meta['min']} - {meta['max']}{meta['unit']}]."
-                )
+        # 1. Check feature domain bounds using dynamic statistics
+        for feat, meta in self.feature_stats.items():
+            if hasattr(data, feat):
+                val = getattr(data, feat)
+                min_val = meta.get("min", 0.0)
+                max_val = meta.get("max", 5.0)
+                unit_str = meta.get("unit", "")
+                if val < min_val or val > max_val:
+                    is_ood = True
+                    warnings_list.append(
+                        f"Giá trị {feat}={val}{unit_str} nằm ngoài phạm vi quan sát trong tập huấn luyện "
+                        f"[{min_val} - {max_val}{unit_str}]."
+                    )
 
         # 2. Biological check: sum of meat, viscera, shell vs whole weight
         sum_parts = data.Shucked_weight + data.Viscera_weight + data.Shell_weight
         if sum_parts > data.Whole_weight * 1.15:
             is_ood = True
-            warnings.append(
+            warnings_list.append(
                 f"Tổng khối lượng các thành phần ({sum_parts:.3f}g) vượt quá 115% tổng khối lượng Whole_weight ({data.Whole_weight:.3f}g). "
                 "Mẫu có thể có sai số đo lường hoặc mất nước."
             )
@@ -161,11 +262,11 @@ class AbalonePredictor:
         # 3. Height anomaly check
         if data.Height < 0.02 and data.Whole_weight > 0.3:
             is_ood = True
-            warnings.append(
+            warnings_list.append(
                 "Chiều cao quá nhỏ so với khối lượng toàn bộ cá thể (khả năng vỏ bị biến dạng hoặc lỗi đo)."
             )
 
-        return is_ood, warnings
+        return is_ood, warnings_list
 
     def predict(self, input_data: AbaloneInput) -> PredictionResponse:
         """Run k-NN inference, extract nearest neighbors, and return rich response payload.
@@ -216,7 +317,7 @@ class AbalonePredictor:
         neighbor_indices = indices[0]
 
         # Training target rings stored in knn estimator
-        y_train_fit = knn._y if hasattr(knn, "_y") else None
+        y_train_fit = getattr(knn, "_y", None)
 
         nearest_neighbors = []
         neighbor_rings_list = []
@@ -245,7 +346,7 @@ class AbalonePredictor:
         )
 
         # 5. Out-of-Distribution Check
-        is_ood, warnings = self.check_out_of_distribution(input_data)
+        is_ood, warnings_list = self.check_out_of_distribution(input_data)
 
         return PredictionResponse(
             predicted_rings=pred_rings_rounded,
@@ -254,60 +355,89 @@ class AbalonePredictor:
             reference_interval=reference_interval,
             nearest_neighbors=nearest_neighbors,
             is_out_of_distribution=is_ood,
-            warnings=warnings,
+            warnings=warnings_list,
         )
 
     def get_dataset_stats(self) -> DatasetStatsResponse:
         """Return dataset boundaries and descriptions for client form validation."""
         numeric_ranges = {
             k: FeatureRangeItem(
-                unit=v["unit"],
-                description=v["desc"],
-                min=v["min"],
-                max=v["max"],
-                mean=v["mean"],
-                std=v["std"],
+                unit=v.get("unit", "-"),
+                description=v.get("desc", k),
+                min=float(v.get("min", 0.0)),
+                max=float(v.get("max", 5.0)),
+                mean=float(v.get("mean", 0.0)),
+                std=float(v.get("std", 1.0)),
             )
-            for k, v in FEATURE_METADATA.items()
+            for k, v in self.feature_stats.items()
         }
         return DatasetStatsResponse(
             numeric_ranges=numeric_ranges,
-            valid_sex_values=["M", "F", "I"],
-            total_training_samples=3341,
+            valid_sex_values=self.valid_sex_values,
+            total_training_samples=self.total_training_samples,
         )
 
     def get_model_card(self) -> ModelCardResponse:
-        """Return Model Card specification."""
+        """Return Model Card specification synchronized dynamically with experimental results."""
         knn = self.pipeline.named_steps["knn"]
-        return ModelCardResponse(
-            pipeline_steps=[
-                "StandardScaler (7 numerical features)",
-                "OneHotEncoder (Sex categorical feature)",
-                f"KNeighborsRegressor(n_neighbors={knn.n_neighbors}, weights='{knn.weights}')",
-            ],
-            hyperparameters={
-                "n_neighbors": knn.n_neighbors,
-                "weights": knn.weights,
-                "metric": knn.metric,
-                "scaling": "StandardScaler",
-                "cv_folds": 5,
-            },
-            performance_metrics={
+
+        # Default fallback metrics if metadata is empty
+        perf_metrics = self.metadata.get(
+            "performance_metrics",
+            {
                 "Test_MAE": 1.551,
                 "Test_RMSE": 2.259,
                 "Test_R2": 0.529,
                 "Baseline_Median_MAE": 2.378,
             },
-            age_group_mae={
-                "Young (<=8 rings)": 1.341,
-                "Middle (9-12 rings)": 1.396,
-                "Old (>12 rings)": 2.651,
+        )
+
+        # Exactly synchronized with reports/age_group_mae.csv
+        age_mae = self.metadata.get(
+            "age_group_mae",
+            {
+                "Young (<=8 rings)": 1.114,
+                "Middle (9-12 rings)": 1.125,
+                "Old (>12 rings)": 3.845,
             },
-            limitations=[
-                "Mô hình có độ chính xác cao nhất ở nhóm bào ngư non và trung bình (MAE ~ 1.3-1.4).",
-                "Độ phân tán và sai số tăng rõ rệt ở nhóm bào ngư già (>12 vòng) do mật độ mẫu huấn luyện ít.",
-                "Không thay thế hoàn toàn phương pháp cắt vỏ và soi kính hiển vi sinh học tiêu chuẩn.",
+        )
+
+        limitations = self.metadata.get(
+            "limitations",
+            [
+                "Mô hình đạt độ chính xác cao nhất ở nhóm bào ngư non (MAE = 1.114) và trung bình (MAE = 1.125).",
+                "Độ phân tán và sai số tăng rõ rệt ở nhóm già (>12 vòng, MAE = 3.845) do mẫu già khan hiếm và sinh trưởng chậm.",
+                "Thí nghiệm so sánh Scaling và No-Scale được xác minh qua 5-Fold CV trên Train để chống rò rỉ tập Test.",
+                "Không thay thế hoàn toàn phương pháp cắt vỏ và đếm vòng kính hiển vi sinh học tiêu chuẩn.",
             ],
+        )
+
+        pipeline_steps = self.metadata.get(
+            "pipeline_steps",
+            [
+                "StandardScaler (7 numerical features)",
+                "OneHotEncoder (Sex categorical feature)",
+                f"KNeighborsRegressor(n_neighbors={knn.n_neighbors}, weights='{knn.weights}')",
+            ],
+        )
+
+        hyperparams = self.metadata.get(
+            "hyperparameters",
+            {
+                "n_neighbors": knn.n_neighbors,
+                "weights": knn.weights,
+                "metric": "minkowski (p=2 Euclidean)",
+                "scaling": "StandardScaler",
+                "cv_folds": 5,
+            },
+        )
+
+        return ModelCardResponse(
+            pipeline_steps=pipeline_steps,
+            hyperparameters=hyperparams,
+            performance_metrics=perf_metrics,
+            age_group_mae=age_mae,
+            limitations=limitations,
         )
 
 

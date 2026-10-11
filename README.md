@@ -23,10 +23,12 @@ abalone-age-estimation/
 │   ├── train.py                # K-Fold CV, chọn tham số & lưu Model
 │   └── evaluate.py             # Đánh giá metric, phân tích sai số & vẽ biểu đồ
 ├── models/
-│   └── abalone_knn_pipeline.pkl# Pipeline k-NN đã huấn luyện hoàn chỉnh
+│   ├── abalone_knn_pipeline.pkl# Pipeline k-NN đã huấn luyện hoàn chỉnh
+│   └── model_metadata.json     # Siêu dữ liệu động đồng bộ với API & Model Card
 ├── reports/
 │   ├── cv_results.csv          # Bảng kết quả 5-Fold Cross Validation
-│   ├── model_results.csv       # Bảng so sánh hiệu năng các mô hình
+│   ├── cv_ablation.csv         # Bảng so sánh Cross-Validation Scaled vs No-Scale trên Train
+│   ├── model_results.csv       # Bảng so sánh hiệu năng các mô hình trên Test
 │   ├── age_group_mae.csv       # Phân tích sai số theo nhóm tuổi
 │   └── figures/                # Biểu đồ phân tích EDA và đánh giá mô hình
 │       ├── rings_distribution.png
@@ -134,7 +136,7 @@ python -m app.test_api
 
 ## 🔬 Các thí nghiệm bắt buộc & Kết quả
 
-1. **Thí nghiệm 1 (Baseline vs. k-NN):** Mô hình k-NN vượt trội hoàn toàn so với Median Baseline ($R^2 \approx 0.53$ vs $R^2 \approx -0.07$).
-2. **Thí nghiệm 2 (Có scale vs. Không scale):** Đánh giá tác động của `StandardScaler` lên khoảng cách Euclidean của k-NN.
-3. **Thí nghiệm 3 (Đồ thị MAE theo K):** Tìm được $K$ tối ưu thông qua 5-Fold CV trên tập huấn luyện (`reports/figures/mae_vs_k.png`).
-4. **Thí nghiệm 4 (Sai số theo nhóm tuổi):** Phân tích sự khác biệt MAE giữa các nhóm `Young` ($\le 8$), `Middle` ($9-12$), và `Old` ($> 12$).
+1. **Thí nghiệm 1 (Baseline vs. k-NN):** Mô hình k-NN vượt trội hoàn toàn so với Median Baseline ($R^2 \approx 0.529$, $MAE \approx 1.551$ so với $R^2 \approx -0.073$, $MAE \approx 2.378$).
+2. **Thí nghiệm 2 (Có scale vs. Không scale):** So sánh bằng 5-Fold Cross-Validation trên Train (`reports/cv_ablation.csv`) để chọn mô hình khách quan không rò rỉ tập Test, sau đó kiểm định trên Test set.
+3. **Thí nghiệm 3 (Đồ thị MAE theo K):** Tìm $K$ tối ưu qua 5-Fold CV trên tập huấn luyện cho cả 2 phương án tiền xử lý (`reports/figures/mae_vs_k.png`).
+4. **Thí nghiệm 4 (Sai số theo nhóm tuổi):** Phân tích sự khác biệt MAE giữa các nhóm `Young` ($\le 8$), `Middle` ($9-12$), và `Old` ($> 12$), chỉ rõ nhóm già có sai số cao ($MAE \approx 3.845$) do đặc thù sinh học và độ lệch phân bố.

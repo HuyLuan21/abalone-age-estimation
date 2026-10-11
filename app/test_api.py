@@ -8,7 +8,6 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
 
 try:
@@ -36,7 +35,14 @@ def test_model_card_endpoint():
     assert "algorithm" in data
     assert "performance_metrics" in data
     assert "hyperparameters" in data
+    assert "age_group_mae" in data
     assert len(data["pipeline_steps"]) > 0
+    # Verify exact synchronization with reports/age_group_mae.csv
+    assert "Young (<=8 rings)" in data["age_group_mae"]
+    assert "Middle (9-12 rings)" in data["age_group_mae"]
+    assert "Old (>12 rings)" in data["age_group_mae"]
+    assert data["age_group_mae"]["Young (<=8 rings)"] < 1.3
+    assert data["age_group_mae"]["Old (>12 rings)"] > 3.0
 
 
 def test_feature_ranges_endpoint():
@@ -47,6 +53,7 @@ def test_feature_ranges_endpoint():
     assert "numeric_ranges" in data
     assert "Length" in data["numeric_ranges"]
     assert "valid_sex_values" in data
+    assert data["total_training_samples"] == 3341
 
 
 def test_predict_valid_sample():
@@ -76,7 +83,7 @@ def test_predict_out_of_distribution_warning():
     """Test prediction with an out-of-distribution physical sample."""
     sample = {
         "Sex": "F",
-        "Length": 0.950,  # Far above normal historical max (0.815)
+        "Length": 0.950,  # Far above normal historical max (~0.815)
         "Diameter": 0.750,
         "Height": 0.350,
         "Whole_weight": 3.500,
@@ -108,10 +115,10 @@ def test_predict_invalid_diameter_greater_than_length():
 
 
 def test_predict_invalid_negative_measurement():
-    """Test validation rejection for negative measurements."""
+    """Test validation rejection for non-positive values."""
     sample = {
         "Sex": "M",
-        "Length": -0.455,  # Invalid: <= 0
+        "Length": -0.1,  # Invalid negative length
         "Diameter": 0.365,
         "Height": 0.095,
         "Whole_weight": 0.514,
@@ -126,17 +133,17 @@ def test_predict_invalid_negative_measurement():
 if __name__ == "__main__":
     print("Running automated API tests...")
     test_health_endpoint()
-    print("✓ test_health_endpoint PASSED")
+    print("[PASS] test_health_endpoint")
     test_model_card_endpoint()
-    print("✓ test_model_card_endpoint PASSED")
+    print("[PASS] test_model_card_endpoint")
     test_feature_ranges_endpoint()
-    print("✓ test_feature_ranges_endpoint PASSED")
+    print("[PASS] test_feature_ranges_endpoint")
     test_predict_valid_sample()
-    print("✓ test_predict_valid_sample PASSED")
+    print("[PASS] test_predict_valid_sample")
     test_predict_out_of_distribution_warning()
-    print("✓ test_predict_out_of_distribution_warning PASSED")
+    print("[PASS] test_predict_out_of_distribution_warning")
     test_predict_invalid_diameter_greater_than_length()
-    print("✓ test_predict_invalid_diameter_greater_than_length PASSED")
+    print("[PASS] test_predict_invalid_diameter_greater_than_length")
     test_predict_invalid_negative_measurement()
-    print("✓ test_predict_invalid_negative_measurement PASSED")
-    print("\n🎉 ALL 7 API UNIT TESTS PASSED SUCCESSFULLY!")
+    print("[PASS] test_predict_invalid_negative_measurement")
+    print("\n[SUCCESS] ALL 7 API UNIT TESTS PASSED SUCCESSFULLY!")

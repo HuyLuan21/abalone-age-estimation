@@ -119,30 +119,58 @@ def plot_mae_vs_k(
     cv_results_df: pd.DataFrame,
     output_path: str = "reports/figures/mae_vs_k.png",
 ) -> None:
-    """Plot Cross-Validation MAE curve across various K values for both weighting schemes."""
+    """Plot Cross-Validation MAE curve across various K values for both weighting schemes and scalings."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    plt.figure(figsize=(9, 6))
 
-    for weights, color, marker in [("uniform", "#2563eb", "o"), ("distance", "#10b981", "s")]:
-        subset = cv_results_df[cv_results_df["Weights"] == weights]
-        plt.plot(
-            subset["K"],
-            subset["MAE"],
-            marker=marker,
-            label=f"Weights = {weights}",
-            color=color,
-            linewidth=2,
-            markersize=6,
-        )
-
-    plt.xlabel("Number of Neighbors (K)", fontsize=12)
-    plt.ylabel("Cross-Validation MAE", fontsize=12)
-    plt.title("Cross-Validation MAE vs. K", fontsize=14, fontweight="bold")
-    plt.legend(fontsize=11)
-    plt.grid(True, linestyle="--", alpha=0.6)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300)
-    plt.close()
+    if "Scaling" in cv_results_df.columns and len(cv_results_df["Scaling"].unique()) > 1:
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+        scalings = ["StandardScaler", "No Scale"]
+        for idx, sc in enumerate(scalings):
+            ax = axes[idx]
+            sub_sc = cv_results_df[cv_results_df["Scaling"] == sc]
+            for weights, color, marker in [("uniform", "#2563eb", "o"), ("distance", "#10b981", "s")]:
+                subset = sub_sc[sub_sc["Weights"] == weights]
+                if not subset.empty:
+                    ax.plot(
+                        subset["K"],
+                        subset["MAE"],
+                        marker=marker,
+                        label=f"Weights = {weights}",
+                        color=color,
+                        linewidth=2,
+                        markersize=5,
+                    )
+            ax.set_title(f"Ablation CV: {sc}", fontsize=13, fontweight="bold")
+            ax.set_xlabel("Number of Neighbors (K)", fontsize=11)
+            ax.grid(True, linestyle="--", alpha=0.5)
+            ax.legend(fontsize=10)
+        axes[0].set_ylabel("Cross-Validation MAE", fontsize=11)
+        fig.suptitle("Cross-Validation MAE vs. K (Ablation: Scaled vs. Unscaled on Train)", fontsize=14, fontweight="bold")
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300)
+        plt.close()
+    else:
+        plt.figure(figsize=(9, 6))
+        for weights, color, marker in [("uniform", "#2563eb", "o"), ("distance", "#10b981", "s")]:
+            subset = cv_results_df[cv_results_df["Weights"] == weights]
+            if not subset.empty:
+                plt.plot(
+                    subset["K"],
+                    subset["MAE"],
+                    marker=marker,
+                    label=f"Weights = {weights}",
+                    color=color,
+                    linewidth=2,
+                    markersize=6,
+                )
+        plt.xlabel("Number of Neighbors (K)", fontsize=12)
+        plt.ylabel("Cross-Validation MAE", fontsize=12)
+        plt.title("Cross-Validation MAE vs. K", fontsize=14, fontweight="bold")
+        plt.legend(fontsize=11)
+        plt.grid(True, linestyle="--", alpha=0.6)
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=300)
+        plt.close()
 
 
 def plot_model_comparison(
@@ -227,8 +255,12 @@ def save_evaluation_tables(
     results_df: pd.DataFrame,
     group_mae_series: pd.Series,
     reports_dir: str = "reports",
+    cv_ablation_df: Any = None,
 ) -> None:
     """Save model performance summary tables to CSV."""
     os.makedirs(reports_dir, exist_ok=True)
     results_df.to_csv(os.path.join(reports_dir, "model_results.csv"), index=False)
     group_mae_series.to_csv(os.path.join(reports_dir, "age_group_mae.csv"))
+    if cv_ablation_df is not None and isinstance(cv_ablation_df, pd.DataFrame):
+        cv_ablation_df.to_csv(os.path.join(reports_dir, "cv_ablation.csv"), index=False)
+
