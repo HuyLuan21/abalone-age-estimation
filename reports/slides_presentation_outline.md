@@ -34,14 +34,16 @@
 ---
 
 ## SLIDE 4: Chiến lược phân chia dữ liệu & Phòng chống rò rỉ (Zero Data Leakage)
-- **Quy trình phân chia độc lập:**
-  - Phân chia ngẫu nhiên $80/20$ với `random_state=42`:
-    - **Tập Huấn luyện (Train set):** 3,338 mẫu (80%).
-    - **Tập Kiểm thử (Test set):** 835 mẫu (20%).
+- **Quy trình phân chia độc lập 3 tập (70/15/15):**
+  - Phân chia tĩnh với `random_state=42` bảo toàn 4,173 mẫu sạch:
+    - **Tập Huấn luyện (Train set - 70%):** 2,921 mẫu.
+    - **Tập Kiểm định (Validation set - 15%):** 626 mẫu.
+    - **Tập Kiểm thử (Test set - 15%):** 626 mẫu.
 - **Nguyên tắc chống rò rỉ thông tin (Data Leakage Prevention):**
-  - Tập Test hoàn toàn bị niêm phong (held-out) trong suốt quá trình tiền xử lý, chuẩn hóa và tìm kiếm siêu tham số.
-  - Toàn bộ siêu tham số ($K$, hàm trọng số, bộ chuẩn hóa) được lựa chọn **duy nhất** thông qua 5-Fold Cross-Validation trên 3,338 mẫu của tập Train.
-  - Tập Test chỉ được nạp vào đúng một lần duy nhất để ghi nhận báo cáo khách quan.
+  - Tách tập ngay từ đầu trước mọi bước fit scaler hay encoder.
+  - Toàn bộ siêu tham số ($K$, hàm trọng số, bộ chuẩn hóa) được lựa chọn **duy nhất** thông qua 5-Fold Cross-Validation trên 2,921 mẫu của tập Train.
+  - Tập Validation (626 mẫu) kiểm tra độc lập và chốt (freeze) mô hình trước khi mở tập Test.
+  - Tập Test (626 mẫu) hoàn toàn bị niêm phong (held-out), chỉ được nạp vào đúng một lần duy nhất để ghi nhận báo cáo khách quan.
 
 ---
 
@@ -63,33 +65,36 @@
   - Chuẩn hóa: `No Scale` vs `StandardScaler`.
   - Tổng số cấu hình đánh giá: $30 \times 2 \times 2 = 120$ cấu hình qua $120 \times 5 = 600$ lần huấn luyện.
 - **Kết quả thực nghiệm trên Train CV (Tiêu chí tối thiểu hóa CV MAE):**
-  - **Cấu hình tối ưu nhất:** `KNN - No Scale` với $K=19$, `weights='distance'` $\rightarrow$ **CV MAE = 1.5022 $\pm$ 0.0427**.
-  - **Cấu hình đối sánh (Ablation):** `KNN - StandardScaler` với $K=25$, `weights='distance'` $\rightarrow$ **CV MAE = 1.5275 $\pm$ 0.0443**.
-  - *Nhận xét:* Việc sử dụng trọng số theo khoảng cách (`distance`) giúp giảm hiện tượng overfitting ở $K$ nhỏ và cải thiện độ mượt ở $K$ lớn.
+  - **Cấu hình tối ưu nhất:** `KNN - No Scale` với $K=17$, `weights='distance'` $\rightarrow$ **CV MAE = 1.5213 $\pm$ 0.0570**.
+  - **Cấu hình đối sánh (Ablation):** `KNN - StandardScaler` với $K=25$, `weights='distance'` $\rightarrow$ **CV MAE = 1.5360 $\pm$ 0.0395**.
+  - **Đánh giá trên Validation Set (626 mẫu):**
+    - `KNN - No Scale ($K=17$)`: **Val MAE = 1.4564**, RMSE = 2.1468, $R^2 = 0.5394$.
+    - `KNN - StandardScaler ($K=25$)`: Val MAE = 1.5190, RMSE = 2.2281, $R^2 = 0.5039$.
+  - *Nhận xét:* Mô hình không chuẩn hóa đạt hiệu năng tốt hơn và được chọn để khóa lại trước khi đánh giá trên tập Test.
 
 ---
 
 ## SLIDE 7: Kết quả đánh giá trên tập kiểm thử độc lập (Test Set)
-- **Bảng so sánh hiệu năng trên 835 mẫu Test:**
+- **Bảng so sánh hiệu năng trên 626 mẫu Test (Held-out):**
   | Mô hình | Test MAE | Test RMSE | Hệ số $R^2$ |
   | :--- | :---: | :---: | :---: |
-  | **Median Baseline (Dummy)** | 2.5401 | 3.6095 | -0.0880 |
-  | **KNN - StandardScaler ($K=25$)** | 1.5549 | 2.3335 | 0.5453 |
-  | **KNN - No Scale ($K=19$, Best Model)** | **1.5223** | **2.2742** | **0.5681** |
+  | **Median Baseline (Dummy)** | 2.5655 | 3.5937 | -0.0992 |
+  | **KNN - StandardScaler ($K=25$)** | 1.5490 | 2.3308 | 0.5540 |
+  | **KNN - No Scale ($K=17$, Best Model)** | **1.5063** | **2.2778** | **0.5741** |
 - **Đánh giá định lượng:**
-  - Mô hình tối ưu cải thiện **40.1% MAE** so với mô hình cơ sở ngẫu nhiên.
-  - Giải thích được xấp xỉ **56.8% phương sai** của số vòng vỏ thực tế ($R^2 = 0.5681$).
+  - Mô hình tối ưu cải thiện **41.3% MAE** so với mô hình cơ sở ngẫu nhiên.
+  - Giải thích được xấp xỉ **57.4% phương sai** của số vòng vỏ thực tế ($R^2 = 0.5741$).
 
 ---
 
 ## SLIDE 8: Phân tích sai số sinh học theo nhóm tuổi (Error Analysis)
-- **Sai số phân bổ theo 3 giai đoạn trưởng thành:**
-  - **Nhóm Trẻ ($\le 8$ vòng):** $\text{MAE} = \mathbf{1.028}$ vòng ($\approx 1.0$ tuổi).
-  - **Nhóm Trung niên ($9 - 12$ vòng):** $\text{MAE} = \mathbf{1.004}$ vòng ($\approx 1.0$ tuổi).
-  - **Nhóm Già ($> 12$ vòng):** $\text{MAE} = \mathbf{3.892}$ vòng ($\approx 3.9$ tuổi).
+- **Sai số phân bổ theo 3 giai đoạn trưởng thành (trên 626 mẫu Test):**
+  - **Nhóm Trẻ ($\le 8$ vòng):** $\text{MAE} = \mathbf{1.034}$ vòng ($\approx 1.0$ tuổi).
+  - **Nhóm Trung niên ($9 - 11$ vòng):** $\text{MAE} = \mathbf{0.932}$ vòng ($\approx 0.9$ tuổi).
+  - **Nhóm Già ($\ge 12$ vòng):** $\text{MAE} = \mathbf{3.732}$ vòng ($\approx 3.7$ tuổi).
 - **Lý giải sinh học:**
   - Ở giai đoạn trẻ và trưởng thành, tốc độ phát triển kích thước và khối lượng vỏ diễn ra tuyến tính mạnh mẽ với độ tuổi.
-  - Khi bào ngư già đi ($> 12$ tuổi), tốc độ gia tăng kích thước vỏ chững lại (bão hòa sinh trưởng), trong khi vòng vỏ vẫn tiếp tục tích lũy chậm chạp theo năm. Do đó, các biến hình thái không còn phân tách rõ rệt giữa bào ngư 13 tuổi và 18 tuổi.
+  - Khi bào ngư già đi ($\ge 12$ tuổi), tốc độ gia tăng kích thước vỏ chững lại (bão hòa sinh trưởng), trong khi vòng vỏ vẫn tiếp tục tích lũy chậm chạp theo năm. Do đó, các biến hình thái không còn phân tách rõ rệt giữa bào ngư 13 tuổi và 18 tuổi.
 - **Giải pháp:** Cung cấp khoảng tham chiếu tin cậy và cảnh báo nhóm tuổi già trên hệ thống.
 
 ---

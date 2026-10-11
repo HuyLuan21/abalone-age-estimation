@@ -45,7 +45,7 @@ Tệp dữ liệu sử dụng trực tiếp trong dự án được lưu tại `
   - Giá trị trung bình (Mean): 9.93 vòng ($\pm 3.22$)
 
 ### 3.2. Quy tắc loại bỏ 04 quan sát bất thường trước khi chia tập
-Theo đúng yêu cầu tại Mục 67 của đề tài *(báo cáo chất lượng và danh sách mọi dòng bị loại kèm lý do)*, đúng **04 dòng dữ liệu vi phạm vật lý và lỗi ghi chép** đã được xác định và loại bỏ trước khi chia Train/Test, lưu bảng theo dõi tại [`reports/removed_anomalies.csv`](../reports/removed_anomalies.csv):
+Theo đúng yêu cầu tại Mục 67 của đề tài *(báo cáo chất lượng và danh sách mọi dòng bị loại kèm lý do)*, đúng **04 dòng dữ liệu vi phạm vật lý và lỗi ghi chép** đã được xác định và loại bỏ trước khi chia Train/Validation/Test, lưu bảng theo dõi tại [`reports/removed_anomalies.csv`](../reports/removed_anomalies.csv):
 
 | Chỉ số dòng gốc | Thuộc tính vi phạm | Giá trị ghi nhận | Lý do khoa học loại bỏ |
 | :---: | :--- | :--- | :--- |
@@ -57,7 +57,14 @@ Theo đúng yêu cầu tại Mục 67 của đề tài *(báo cáo chất lượ
 ### 3.3. Tập dữ liệu sạch đưa vào mô hình (Cleaned Data - 4,173 mẫu)
 - **Tổng số quan sát:** **4,173 mẫu** (loại đúng 4 dòng nêu trên).
 - **Tính toàn vẹn vật lý:** Toàn bộ các phép đo đều strictly positive ($> 0$), `Height` dao động trong khoảng hợp lý $[0.010, 0.515]$, `Diameter` $\le$ `Length`.
-- **Phân chia tập độc lập:** Tập Train 80% (**3,338 mẫu**) và tập Test 20% (**835 mẫu**), bảo đảm không rò rỉ dữ liệu.
+- **Chiến lược phân chia 3 tập độc lập (70% Train / 15% Validation / 15% Test):**
+  Tuân thủ nghiêm ngặt quy định chống rò rỉ dữ liệu (Zero Data Leakage) của đề tài:
+  - **Tập Huấn luyện (Train set - 70%):** **2,921 mẫu**. Dùng để huấn luyện pipeline và thực hiện 5-Fold Cross-Validation dò tìm siêu tham số ($K$, hàm trọng số `weights`, bộ chuẩn hóa scaler).
+  - **Tập Kiểm định (Validation set - 15%):** **626 mẫu**. Dùng làm tập đối chứng độc lập nhằm đánh giá và khóa (lock) cấu hình mô hình tối ưu trước khi mở tập Test.
+  - **Tập Kiểm thử niêm phong (Test set - 15%):** **626 mẫu**. Dữ liệu hoàn toàn độc lập (held-out), chỉ được đưa vào đánh giá đúng 1 lần duy nhất để báo cáo hiệu năng thực tế cuối cùng (MAE, RMSE, $R^2$ và phân tích sai số theo nhóm tuổi). Tuyệt đối không can thiệp vào quá trình chọn mô hình hay tinh chỉnh siêu tham số.
+- **Kiểm định tính toàn vẹn phân vùng dữ liệu:**
+  - Tập chỉ số (indices) hoàn toàn rời nhau: $\text{Train} \cap \text{Val} = \emptyset$, $\text{Train} \cap \text{Test} = \emptyset$, $\text{Val} \cap \text{Test} = \emptyset$.
+  - Bảo toàn chính xác tổng số mẫu: $2,921 + 626 + 626 = 4,173\text{ mẫu}$ ($100\%$).
 
 ---
 
