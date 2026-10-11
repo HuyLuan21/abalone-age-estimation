@@ -974,32 +974,43 @@ function App() {
             ) : null}
           </section>
 
-          <section className="panel chart-panel experiment-card">
+          <section className="panel chart-panel experiment-card baseline-experiment">
             <div className="section-header">
               <BarChart3 size={18} />
               <h2>Thí nghiệm 1 · Median Baseline và KNN</h2>
             </div>
             {evaluationReports ? (
               <>
-                <div className="chart-box">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={evaluationReports.modelResults} margin={{ top: 12, right: 18, left: 4, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="model" tick={{ fontSize: 12 }} />
-                      <YAxis label={{ value: 'MAE (Rings)', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip formatter={(value) => [`${Number(value).toFixed(4)} Rings`, 'MAE · Test']} />
-                      <Bar dataKey="mae" name="MAE · Test" fill="#1f7ae0" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="baseline-chart-scroll">
+                  <div className="chart-box baseline-chart">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={evaluationReports.modelResults} margin={{ top: 12, right: 18, left: 4, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="model" tick={{ fontSize: 12 }} />
+                        <YAxis label={{ value: 'MAE (Rings)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip formatter={(value) => [`${Number(value).toFixed(4)} Rings`, 'MAE · Test']} />
+                        <Bar dataKey="mae" name="MAE · Test" fill="#1f7ae0" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-                <div className="table-scroll">
-                  <table className="range-table compact-table">
-                    <thead><tr><th>Mô hình</th><th>MAE · Test (Rings)</th><th>RMSE · Test (Rings)</th><th>R² · Test</th></tr></thead>
+                <div className="baseline-results-scroll">
+                  <table className="baseline-results-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Mô hình</th>
+                        <th scope="col">MAE · Test (Rings)</th>
+                        <th scope="col">RMSE · Test (Rings)</th>
+                        <th scope="col">R² · Test</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {evaluationReports.modelResults.map((row) => (
                         <tr key={row.model}>
-                          <td>{row.model}</td><td>{formatNumber(row.mae, 4)}</td>
-                          <td>{formatNumber(row.rmse, 4)}</td><td>{formatNumber(row.r2, 4)}</td>
+                          <th scope="row">{row.model}</th>
+                          <td>{formatNumber(row.mae, 4)}</td>
+                          <td>{formatNumber(row.rmse, 4)}</td>
+                          <td>{formatNumber(row.r2, 4)}</td>
                         </tr>
                       ))}
                     </tbody>
