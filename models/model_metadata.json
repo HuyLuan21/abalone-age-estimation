@@ -11,15 +11,14 @@
     "M"
   ],
   "pipeline_steps": [
-    "StandardScaler (7 numerical features)",
     "OneHotEncoder (Sex categorical feature)",
-    "KNeighborsRegressor(n_neighbors=25, weights='distance')"
+    "KNeighborsRegressor(n_neighbors=19, weights='distance')"
   ],
   "hyperparameters": {
-    "n_neighbors": 25,
+    "n_neighbors": 19,
     "weights": "distance",
     "metric": "minkowski (p=2 Euclidean)",
-    "scaling": "StandardScaler",
+    "scaling": "No Scale",
     "cv_folds": 5,
     "random_state": 42
   },
@@ -30,19 +29,19 @@
     "best_unscaled_cv_std": 0.0427
   },
   "performance_metrics": {
-    "Test_MAE": 1.5549,
-    "Test_RMSE": 2.3335,
-    "Test_R2": 0.5453,
+    "Test_MAE": 1.5223,
+    "Test_RMSE": 2.2742,
+    "Test_R2": 0.5681,
     "Baseline_Median_MAE": 2.5401
   },
   "age_group_mae": {
-    "Young (<=8 rings)": 1.0278,
-    "Middle (9-12 rings)": 1.0041,
-    "Old (>12 rings)": 3.8916
+    "Young (<=8 rings)": 1.0486,
+    "Middle (9-12 rings)": 1.0016,
+    "Old (>12 rings)": 3.6879
   },
   "limitations": [
-    "Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = 1.028) và trung bình (MAE = 1.004).",
-    "Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = 3.892) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
+    "Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = 1.049) và trung bình (MAE = 1.002).",
+    "Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = 3.688) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
     "Quy trình so sánh mô hình (Scaling vs No-Scale) được chọn dựa trên 5-Fold Cross-Validation trên Train để bảo đảm không rò rỉ tập Test.",
     "Ước lượng hỗ trợ sàng lọc sơ bộ, không thay thế quy trình cắt vỏ và đếm vòng kính hiển vi tiêu chuẩn."
   ],

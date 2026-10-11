@@ -152,13 +152,18 @@ def run_pipeline(
         print(f"    - {row['Preprocessing']:14s}: Best K={row['Best_K']:2d}, Weights='{row['Best_Weights']}', CV MAE={row['CV_MAE']:.4f} +/- {row['CV_STD']:.4f}")
 
     # Select best configurations based STRICTLY on Train CV
+    best_overall_config = select_best_hyperparameters(cv_results_df, force_scaling=None)
     best_scaled_config = select_best_hyperparameters(cv_results_df, force_scaling=True)
     best_unscaled_config = select_best_hyperparameters(cv_results_df, force_scaling=False)
 
-    best_k = best_scaled_config["best_k"]
-    best_weights = best_scaled_config["best_weights"]
-    print(f"\n  [OK] Selected Primary Model (StandardScaler): K = {best_k}, Weights = '{best_weights}'")
-    print(f"  [OK] Best Scaled CV MAE     : {best_scaled_config['best_cv_mae']:.4f} +/- {best_scaled_config['best_cv_std']:.4f}")
+    best_k = best_overall_config["best_k"]
+    best_weights = best_overall_config["best_weights"]
+    best_scaling = best_overall_config["best_scaling"]
+    with_scaling = best_overall_config["with_scaling"]
+
+    print(f"\n  [OK] Selected Primary Model based on Train CV ({best_scaling}): K = {best_k}, Weights = '{best_weights}'")
+    print(f"  [OK] Best Overall CV MAE    : {best_overall_config['best_cv_mae']:.4f} +/- {best_overall_config['best_cv_std']:.4f}")
+    print(f"  [OK] Best Scaled CV MAE     : {best_scaled_config['best_cv_mae']:.4f} (K={best_scaled_config['best_k']}, Weights='{best_scaled_config['best_weights']}')")
     print(f"  [OK] Best Unscaled CV MAE   : {best_unscaled_config['best_cv_mae']:.4f} (K={best_unscaled_config['best_k']}, Weights='{best_unscaled_config['best_weights']}')")
     print("  [OK] Saved reports/cv_results.csv, reports/cv_ablation.csv and reports/figures/mae_vs_k.png")
 
@@ -169,34 +174,46 @@ def run_pipeline(
         y_train,
         n_neighbors=best_k,
         weights=best_weights,
-        with_scaling=True,
+        with_scaling=with_scaling,
     )
     save_model_pipeline(final_pipeline, "models/abalone_knn_pipeline.pkl")
-    print("  [OK] Saved primary model artifact to models/abalone_knn_pipeline.pkl")
+    print(f"  [OK] Saved primary model artifact ({best_scaling}) to models/abalone_knn_pipeline.pkl")
 
-    # Fit unscaled pipeline (with its CV-optimal parameters) for final test reporting
-    unscaled_pipeline = build_knn_pipeline(
-        n_neighbors=best_unscaled_config["best_k"],
-        weights=best_unscaled_config["best_weights"],
-        with_scaling=False,
+    # Fit alternative ablation pipeline for comparison
+    alt_scaling = not with_scaling
+    alt_config = best_scaled_config if alt_scaling else best_unscaled_config
+    alt_pipeline = build_knn_pipeline(
+        n_neighbors=alt_config["best_k"],
+        weights=alt_config["best_weights"],
+        with_scaling=alt_scaling,
     )
-    unscaled_pipeline.fit(X_train, y_train)
+    alt_pipeline.fit(X_train, y_train)
 
     # 7. Final Independent Test Set Evaluation & Error Analysis
     print("\n[7/7] Evaluating independently on Test set (held-out evaluation)...")
     final_pred = final_pipeline.predict(X_test)
     final_metrics = calculate_metrics(y_test, final_pred)
 
-    unscaled_pred = unscaled_pipeline.predict(X_test)
-    unscaled_metrics = calculate_metrics(y_test, unscaled_pred)
+    alt_pred = alt_pipeline.predict(X_test)
+    alt_metrics = calculate_metrics(y_test, alt_pred)
 
-    results_df = pd.DataFrame(
-        [
-            {"Model": "Median Baseline", **baseline_metrics},
-            {"Model": "KNN - No Scale", **unscaled_metrics},
-            {"Model": "KNN - StandardScaler", **final_metrics},
-        ]
-    )
+    # Structure results table
+    if with_scaling:
+        results_df = pd.DataFrame(
+            [
+                {"Model": "Median Baseline", **baseline_metrics},
+                {"Model": "KNN - No Scale", **alt_metrics},
+                {"Model": "KNN - StandardScaler", **final_metrics},
+            ]
+        )
+    else:
+        results_df = pd.DataFrame(
+            [
+                {"Model": "Median Baseline", **baseline_metrics},
+                {"Model": "KNN - No Scale", **final_metrics},
+                {"Model": "KNN - StandardScaler", **alt_metrics},
+            ]
+        )
 
     plot_model_comparison(results_df, "reports/figures/model_comparison.png")
     plot_actual_vs_predicted(y_test, final_pred, "reports/figures/actual_vs_predicted.png")
@@ -206,6 +223,19 @@ def run_pipeline(
     save_evaluation_tables(results_df, group_mae, "reports", cv_ablation_df=cv_ablation_df)
 
     # Save comprehensive model and dataset metadata for dynamic API synchronization
+    pipeline_steps_list = (
+        [
+            "StandardScaler (7 numerical features)",
+            "OneHotEncoder (Sex categorical feature)",
+            f"KNeighborsRegressor(n_neighbors={best_k}, weights='{best_weights}')",
+        ]
+        if with_scaling
+        else [
+            "OneHotEncoder (Sex categorical feature)",
+            f"KNeighborsRegressor(n_neighbors={best_k}, weights='{best_weights}')",
+        ]
+    )
+
     model_metadata = {
         "model_name": "Abalone Age Estimator (K-NN Regression)",
         "algorithm": "K-Nearest Neighbors Regressor with Euclidean Distance",
@@ -214,16 +244,12 @@ def run_pipeline(
         "total_training_samples": int(len(X_train)),
         "total_test_samples": int(len(X_test)),
         "valid_sex_values": sorted(list(X_train["Sex"].unique())),
-        "pipeline_steps": [
-            "StandardScaler (7 numerical features)",
-            "OneHotEncoder (Sex categorical feature)",
-            f"KNeighborsRegressor(n_neighbors={best_k}, weights='{best_weights}')",
-        ],
+        "pipeline_steps": pipeline_steps_list,
         "hyperparameters": {
             "n_neighbors": best_k,
             "weights": best_weights,
             "metric": "minkowski (p=2 Euclidean)",
-            "scaling": "StandardScaler",
+            "scaling": best_scaling,
             "cv_folds": cv_folds,
             "random_state": random_state,
         },

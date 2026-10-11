@@ -178,6 +178,55 @@ def split_data(
     return X_train, X_test, y_train, y_test
 
 
+def split_train_val_test(
+    df: pd.DataFrame,
+    val_size: float = 0.15,
+    test_size: float = 0.15,
+    random_state: int = 42,
+    auto_clean: bool = True,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+    """Split dataset into 3 static partitions: Train, Validation, and Test.
+
+    Useful when hold-out validation is preferred over K-Fold Cross-Validation.
+
+    Args:
+        df: Full DataFrame containing features and target.
+        val_size: Ratio of validation set (default 0.15 for 15%).
+        test_size: Ratio of test set (default 0.15 for 15%).
+        random_state: Random seed for reproducibility.
+        auto_clean: Whether to ensure anomalies are filtered before split.
+
+    Returns:
+        Tuple of (X_train, X_val, X_test, y_train, y_val, y_test).
+    """
+    if auto_clean:
+        has_anomalies = (df["Height"] <= 0).any() or (df["Height"] >= 1.0).any() or (df["Diameter"] > df["Length"]).any()
+        if has_anomalies:
+            df, _ = clean_anomalies(df)
+
+    X = df.drop(columns=[TARGET_NAME])
+    y = df[TARGET_NAME]
+
+    # First split off the Test set
+    X_temp, X_test, y_temp, y_test = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+    )
+
+    # Next split the remainder into Train and Validation
+    val_relative_size = val_size / (1.0 - test_size)
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_temp,
+        y_temp,
+        test_size=val_relative_size,
+        random_state=random_state,
+    )
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+
 if __name__ == "__main__":
     print("=== Testing data.py ===")
     dataset = load_data()
@@ -186,4 +235,6 @@ if __name__ == "__main__":
     clean_df, anomalies_df = clean_anomalies(dataset)
     print(f"Cleaned dataset: {len(clean_df)} rows, Filtered anomalies: {len(anomalies_df)} rows")
     X_tr, X_te, y_tr, y_te = split_data(clean_df)
-    print(f"Train set: {X_tr.shape}, Test set: {X_te.shape}")
+    print(f"Standard Split (Train/Test + CV): Train={X_tr.shape}, Test={X_te.shape}")
+    X_tr3, X_v3, X_te3, _, _, _ = split_train_val_test(clean_df)
+    print(f"Static 3-Way Split (Train/Val/Test): Train={X_tr3.shape}, Val={X_v3.shape}, Test={X_te3.shape}")
