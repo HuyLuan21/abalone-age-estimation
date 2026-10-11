@@ -17,8 +17,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 import ast
 import json
+import warnings
 # pyrefly: ignore [missing-import]
 import joblib
+
+try:
+    from sklearn.exceptions import InconsistentVersionWarning
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except ImportError:
+    pass
 # pyrefly: ignore [missing-import]
 import numpy as np
 import pandas as pd

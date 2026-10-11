@@ -148,11 +148,16 @@ python -m app.test_api
    - **Tập Validation (626 mẫu):** Baseline MAE = $2.3674$ $\rightarrow$ KNN tối ưu MAE = **$1.4564$** (giảm 38.5% sai số).
    - **Tập Test độc lập (626 mẫu):** Baseline MAE = $2.5655$, $R^2 = -0.0992$ $\rightarrow$ KNN tối ưu MAE = **$1.5063$**, $R^2 = \mathbf{0.5741}$.
 2. **Thí nghiệm 2 (Ablation Study: No Scale vs. StandardScaler):**
-   - So sánh bằng 5-Fold Cross-Validation trên tập Train (2,921 mẫu): `KNN - No Scale` đạt CV MAE = **$1.5213 \pm 0.0570$** (tốt hơn `KNN - StandardScaler` có CV MAE = $1.5360 \pm 0.0395$).
-   - Kiểm định trên tập Validation: `KNN - No Scale` đạt MAE = **$1.4564$** (so với StandardScaler MAE = $1.5190$).
-   - Đánh giá trên tập Test: `KNN - No Scale` đạt MAE = **$1.5063$** (so với StandardScaler MAE = $1.5490$).
-3. **Thí nghiệm 3 (Đồ thị MAE theo K):** Tìm $K$ tối ưu qua 5-Fold CV trên Train ($K=17$, `weights='distance'` cho No Scale; $K=25$ cho StandardScaler), lưu tại [`reports/figures/mae_vs_k.png`](reports/figures/mae_vs_k.png).
+   - So sánh bằng 5-Fold Cross-Validation trên tập Train (2,921 mẫu): 
+     * `KNN - No Scale` đạt CV MAE = **$1.5213 \pm 0.0570$** ($K=17$, `weights='distance'`).
+     * `KNN - StandardScaler` đạt CV MAE = $1.5360 \pm 0.0395$ ($K=17$, `weights='distance'`).
+   - Kiểm định độc lập trên tập Validation (626 mẫu):
+     * `KNN - No Scale` đạt **Val MAE = 1.4564** ($R^2 = 0.5394$).
+     * `KNN - StandardScaler` đạt Val MAE = $1.5190$ ($R^2 = 0.5039$).
+   - **Quyết định khóa mô hình (Freeze):** Do `No Scale` chiến thắng ở cả CV lẫn Validation, cấu hình `No Scale (K=17)` được lưu thành artifact chính thức. Theo nguyên tắc niêm phong tập Test (Zero Data Leakage), mô hình StandardScaler bị loại ở bước Validation và **không được đánh giá trên tập Test**.
+   - **Đánh giá duy nhất trên tập Test (626 mẫu):** Mô hình đã khóa đạt **Test MAE = 1.5063**, Test RMSE = **$2.2778$**, $R^2 = \mathbf{0.5741}$.
+3. **Thí nghiệm 3 (Đồ thị MAE theo K):** Tìm $K$ tối ưu qua 5-Fold CV trên Train ($K=17$, `weights='distance'` cho cả No Scale và StandardScaler), lưu đồ thị tại [`reports/figures/mae_vs_k.png`](reports/figures/mae_vs_k.png).
 4. **Thí nghiệm 4 (Phân tích sai số theo nhóm tuổi trên tập Test):**
    - Nhóm non (`Young`, $\le 8$ vòng): $\text{MAE} = \mathbf{1.034}$ vòng.
    - Nhóm trưởng thành (`Middle`, $9-12$ vòng): $\text{MAE} = \mathbf{0.932}$ vòng.
-   - Nhóm già (`Old`, $> 12$ vòng): $\text{MAE} = \mathbf{3.732}$ vòng (do sinh trưởng chậm dần và mật độ mẫu già ít).
+   - Nhóm già (`Old`, $> 12$ vòng): $\text{MAE} = \mathbf{3.732}$ vòng (do hiện tượng bão hòa sinh trưởng kích thước vỏ ở bào ngư già).

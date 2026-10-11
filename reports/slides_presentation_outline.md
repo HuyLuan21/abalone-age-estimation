@@ -28,7 +28,7 @@
 - **Quy tắc làm sạch khoa học (Loại bỏ đúng 04 quan sát bất thường TRƯỚC khi chia tập):**
   1. *Dòng 1210:* `Diameter` ($0.375$) > `Length` ($0.185$) — Vi phạm định nghĩa hình học vỏ (chiều dài là trục đo lớn nhất).
   2. *Dòng 1257 & 3996:* `Height == 0.0` — Bào ngư sống không thể có chiều cao vỏ bằng 0 (phi sinh học).
-  3. *Dòng 2051:* `Height == 1.130` ($226\text{ mm}$) — Lỗi nhập liệu ngoại lai (cao gấp 10 lần trung bình mẫu và lớn hơn chiều dài).
+  3. *Dòng 2051:* `Height == 1.130` ($226\text{ mm}$) — Lỗi nhập liệu ngoại lai (cao gấp 8 lần trung bình loài $28\text{ mm}$ và gấp 2.5 lần chiều dài cá thể $91\text{ mm}$).
 - **Kết quả:** Tập dữ liệu sạch chuẩn mực gồm **4,173 quan sát** (100% kích thước đo lường strictly positive $> 0$).
 
 ---
@@ -66,35 +66,36 @@
   - Tổng số cấu hình đánh giá: $30 \times 2 \times 2 = 120$ cấu hình qua $120 \times 5 = 600$ lần huấn luyện.
 - **Kết quả thực nghiệm trên Train CV (Tiêu chí tối thiểu hóa CV MAE):**
   - **Cấu hình tối ưu nhất:** `KNN - No Scale` với $K=17$, `weights='distance'` $\rightarrow$ **CV MAE = 1.5213 $\pm$ 0.0570**.
-  - **Cấu hình đối sánh (Ablation):** `KNN - StandardScaler` với $K=25$, `weights='distance'` $\rightarrow$ **CV MAE = 1.5360 $\pm$ 0.0395**.
+  - **Cấu hình đối sánh (Ablation):** `KNN - StandardScaler` với $K=17$, `weights='distance'` $\rightarrow$ **CV MAE = 1.5360 $\pm$ 0.0395**.
   - **Đánh giá trên Validation Set (626 mẫu):**
     - `KNN - No Scale ($K=17$)`: **Val MAE = 1.4564**, RMSE = 2.1468, $R^2 = 0.5394$.
-    - `KNN - StandardScaler ($K=25$)`: Val MAE = 1.5190, RMSE = 2.2281, $R^2 = 0.5039$.
-  - *Nhận xét:* Mô hình không chuẩn hóa đạt hiệu năng tốt hơn và được chọn để khóa lại trước khi đánh giá trên tập Test.
+    - `KNN - StandardScaler ($K=17$)`: Val MAE = 1.5190, RMSE = 2.2281, $R^2 = 0.5039$.
+  - *Quyết định:* Mô hình `KNN - No Scale` vượt trội ở cả CV và Validation, được chọn và khóa (lock) thành artifact chính thức. Cấu hình StandardScaler bị loại ở bước Validation.
 
 ---
 
-## SLIDE 7: Kết quả đánh giá trên tập kiểm thử độc lập (Test Set)
-- **Bảng so sánh hiệu năng trên 626 mẫu Test (Held-out):**
-  | Mô hình | Test MAE | Test RMSE | Hệ số $R^2$ |
-  | :--- | :---: | :---: | :---: |
-  | **Median Baseline (Dummy)** | 2.5655 | 3.5937 | -0.0992 |
-  | **KNN - StandardScaler ($K=25$)** | 1.5490 | 2.3308 | 0.5540 |
-  | **KNN - No Scale ($K=17$, Best Model)** | **1.5063** | **2.2778** | **0.5741** |
+## SLIDE 7: Kết quả đánh giá trên tập kiểm thử độc lập (Held-out Test Set)
+- **Bảng hiệu năng trên 626 mẫu Test (Chỉ mở 1 lần cho mô hình đã khóa):**
+  | Mô hình | Vai trò đánh giá | Test MAE | Test RMSE | Hệ số $R^2$ |
+  | :--- | :--- | :---: | :---: | :---: |
+  | **Median Baseline** | Mốc đối chứng (Benchmark) | 2.5655 | 3.6592 | -0.0992 |
+  | **KNN - No Scale ($K=17$)** | **Mô hình chính thức (Locked)** | **1.5063** | **2.2778** | **0.5741** |
+  | *KNN - StandardScaler ($K=17$)* | *Ứng viên bị loại ở Validation* | *N/A (Niêm phong)* | *N/A (Niêm phong)* | *N/A (Niêm phong)* |
 - **Đánh giá định lượng:**
   - Mô hình tối ưu cải thiện **41.3% MAE** so với mô hình cơ sở ngẫu nhiên.
   - Giải thích được xấp xỉ **57.4% phương sai** của số vòng vỏ thực tế ($R^2 = 0.5741$).
+  - *Tuân thủ quy chuẩn:* Ứng viên thay thế không được chấm điểm trên Test nhằm đảm bảo tính khách quan và chống rò rỉ dữ liệu.
 
 ---
 
 ## SLIDE 8: Phân tích sai số sinh học theo nhóm tuổi (Error Analysis)
 - **Sai số phân bổ theo 3 giai đoạn trưởng thành (trên 626 mẫu Test):**
   - **Nhóm Trẻ ($\le 8$ vòng):** $\text{MAE} = \mathbf{1.034}$ vòng ($\approx 1.0$ tuổi).
-  - **Nhóm Trung niên ($9 - 11$ vòng):** $\text{MAE} = \mathbf{0.932}$ vòng ($\approx 0.9$ tuổi).
-  - **Nhóm Già ($\ge 12$ vòng):** $\text{MAE} = \mathbf{3.732}$ vòng ($\approx 3.7$ tuổi).
+  - **Nhóm Trung niên ($9 - 12$ vòng):** $\text{MAE} = \mathbf{0.932}$ vòng ($\approx 0.9$ tuổi).
+  - **Nhóm Già ($> 12$ vòng):** $\text{MAE} = \mathbf{3.732}$ vòng ($\approx 3.7$ tuổi).
 - **Lý giải sinh học:**
   - Ở giai đoạn trẻ và trưởng thành, tốc độ phát triển kích thước và khối lượng vỏ diễn ra tuyến tính mạnh mẽ với độ tuổi.
-  - Khi bào ngư già đi ($\ge 12$ tuổi), tốc độ gia tăng kích thước vỏ chững lại (bão hòa sinh trưởng), trong khi vòng vỏ vẫn tiếp tục tích lũy chậm chạp theo năm. Do đó, các biến hình thái không còn phân tách rõ rệt giữa bào ngư 13 tuổi và 18 tuổi.
+  - Khi bào ngư già đi ($> 12$ tuổi), tốc độ gia tăng kích thước vỏ chững lại (bão hòa sinh trưởng), trong khi vòng vỏ vẫn tiếp tục tích lũy chậm chạp theo năm. Do đó, các biến hình thái không còn phân tách rõ rệt giữa bào ngư 13 tuổi và 18 tuổi.
 - **Giải pháp:** Cung cấp khoảng tham chiếu tin cậy và cảnh báo nhóm tuổi già trên hệ thống.
 
 ---
@@ -131,9 +132,10 @@
 - **Đồng bộ hóa Artifacts:**
   - Tệp mô hình chuẩn hóa: `models/abalone_knn_pipeline.pkl`.
   - Siêu dữ liệu đồng bộ: `models/model_metadata.json` được sinh tự động sau mỗi lần huấn luyện, loại bỏ hoàn toàn metadata fallback lỗi thời.
-- **Bộ kiểm thử tự động (Unit Test Suite):**
-  - `app/test_api.py` gồm 8 ca kiểm thử tích hợp (Health check, Model Card, Feature ranges, Predict UCI scale, Predict physical units, OOD detection, Physical constraint violations).
-  - Kết quả kiểm thử: **100% Passed (8/8 test cases)**.
+- **Bộ kiểm thử tự động toàn diện (Automated Unit Test Suite):**
+  - `tests/test_pipeline.py`: **9 ca kiểm thử Pipeline** (kiểm định 4 dị thường, phân chia 70/15/15 disjoint, tính tái lập, baseline từ train, pipeline đóng gói không rò rỉ, tải artifact `.pkl`, metadata consistency, held-out test protocol, AST static checking thứ tự khóa mô hình trước khi test).
+  - `app/test_api.py`: **10 ca kiểm thử REST API** (Health, Model Card, Feature ranges, Predict UCI units, Predict Physical units, OOD detection, Biometric violations, Negative inputs, Mixed units HTTP 422, Explicit unit system).
+  - Kết quả kiểm thử: **100% Passed (19/19 test cases thành công)**.
 
 ---
 
