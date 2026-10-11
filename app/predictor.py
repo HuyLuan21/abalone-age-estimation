@@ -452,6 +452,7 @@ class AbalonePredictor:
             data_split=self.metadata.get("data_split"),
             age_group_mae=age_mae,
             limitations=limitations,
+            feature_statistics=self.metadata.get("feature_statistics", self.feature_stats),
         )
 
 

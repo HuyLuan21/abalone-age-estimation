@@ -242,3 +242,4 @@ class ModelCardResponse(BaseModel):
     dataset_source: str = "UCI Machine Learning Repository (DOI: 10.24432/C55C7W)"
     intended_use: str = "Hỗ trợ nghiên cứu nuôi trồng và sàng lọc mẫu bào ngư cần kiểm tra vi thể."
     limitations: List[str]
+    feature_statistics: Optional[Dict[str, Any]] = None

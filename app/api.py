@@ -8,11 +8,15 @@ import os
 import sys
 from typing import Dict, Any
 # pyrefly: ignore [missing-import]
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, Request, status
+# pyrefly: ignore [missing-import]
+from fastapi.exceptions import RequestValidationError
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 # pyrefly: ignore [missing-import]
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+# pyrefly: ignore [missing-import]
+from fastapi.staticfiles import StaticFiles
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -56,6 +60,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Format Pydantic validation errors into clean, readable Vietnamese messages."""
+    error_messages = []
+    for err in exc.errors():
+        msg = err.get("msg", "")
+        if msg.startswith("Value error, "):
+            msg = msg[len("Value error, "):]
+        loc = [str(x) for x in err.get("loc", []) if x != "body"]
+        field_str = ".".join(loc)
+        if field_str:
+            error_messages.append(f"{field_str}: {msg}")
+        else:
+            error_messages.append(msg)
+
+    clean_message = "; ".join(error_messages) if error_messages else "Dữ liệu đầu vào không hợp lệ."
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": clean_message, "errors": exc.errors()},
+    )
 
 
 @app.get(
@@ -147,6 +173,34 @@ def predict_age(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi trong quá trình suy luận mô hình: {str(exc)}",
         )
+
+
+# Serve built frontend SPA if available
+frontend_dist = os.path.join(PROJECT_ROOT, "frontend", "dist")
+if os.path.exists(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa_frontend(full_path: str):
+        if (
+            full_path.startswith("api/")
+            or full_path == "api"
+            or full_path.startswith("docs")
+            or full_path.startswith("redoc")
+            or full_path == "openapi.json"
+        ):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API endpoint not found")
+
+        target_file = os.path.join(frontend_dist, full_path)
+        if full_path and os.path.exists(target_file) and os.path.isfile(target_file):
+            return FileResponse(target_file)
+
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Frontend index.html not found")
 
 
 if __name__ == "__main__":

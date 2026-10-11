@@ -101,27 +101,33 @@ python -m src.data
 
 ---
 
-## 🌐 Khởi chạy Backend API (FastAPI)
+## 🌐 Khởi chạy Hệ thống Web & Backend API (Fullstack)
 
-### 1. Khởi động API Server (Chọn 1 trong các cách sau):
+Hệ thống đã được **ghép nối hoàn chỉnh giữa Backend (FastAPI) và Frontend (React + Vite)**:
 
-- **Cách 1 (Ngắn gọn & Dễ nhớ nhất):**
+### 1. Khởi động 1-Click (Khuyên dùng - Chạy cả Giao diện Web + API trên cổng 8000):
+
+Chỉ cần một lệnh duy nhất:
+```powershell
+python run_server.py
+```
+* **Ứng dụng Web (Frontend UI):** `http://127.0.0.1:8000/` (Giao diện 3 màn hình Overview, Dự đoán tuổi, Model Card).
+* **Swagger UI (Tài liệu API tương tác):** `http://127.0.0.1:8000/docs`
+* **ReDoc:** `http://127.0.0.1:8000/redoc`
+* **Health Check API:** `http://127.0.0.1:8000/api/health`
+
+### 2. Chế độ Phát triển Frontend (Hot-reload độc lập):
+
+Nếu muốn chỉnh sửa code giao diện frontend theo thời gian thực:
+* **Terminal 1 (Backend API):** `python run_server.py` (Lắng nghe tại port `8000`)
+* **Terminal 2 (Frontend Dev):** 
   ```powershell
-  python run_server.py
+  cd frontend
+  yarn dev
   ```
-- **Cách 2:**
-  ```powershell
-  python app/api.py
-  ```
-- **Cách 3 (Dùng uvicorn CLI):**
-  ```powershell
-  uvicorn app.api:app --reload --port 8000
-  ```
+  Truy cập `http://localhost:5173/` (Vite dev server tự động proxy toàn bộ request `/api` sang backend port `8000`).
 
-- **Swagger UI (Tài liệu API tương tác):** `http://127.0.0.1:8000/docs`
-- **ReDoc:** `http://127.0.0.1:8000/redoc`
-
-### 2. Các Endpoint API chính:
+### 3. Các Endpoint API chính:
 
 | Phương thức | Endpoint | Mô tả |
 | :--- | :--- | :--- |

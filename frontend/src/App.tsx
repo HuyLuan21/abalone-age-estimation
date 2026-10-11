@@ -238,7 +238,22 @@ function App() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
-        throw new Error(payload?.detail || 'Không thể thực hiện dự đoán với dữ liệu hiện tại.')
+        let errorMsg = 'Không thể thực hiện dự đoán với dữ liệu hiện tại.'
+        if (typeof payload?.detail === 'string') {
+          errorMsg = payload.detail
+        } else if (Array.isArray(payload?.detail)) {
+          errorMsg = payload.detail
+            .map((item: any) => {
+              if (typeof item === 'string') return item
+              const field = Array.isArray(item?.loc) ? item.loc.filter((l: any) => l !== 'body').join('.') : ''
+              const msg = item?.msg?.replace(/^Value error,\s*/i, '') || JSON.stringify(item)
+              return field ? `${field}: ${msg}` : msg
+            })
+            .join('; ')
+        } else if (payload?.message) {
+          errorMsg = String(payload.message)
+        }
+        throw new Error(errorMsg)
       }
 
       const result = (await response.json()) as PredictionResponse

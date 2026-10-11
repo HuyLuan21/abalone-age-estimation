@@ -208,6 +208,14 @@ def test_predict_explicit_unit_system():
     assert resp2.status_code == 200
 
 
+def test_spa_frontend_serving():
+    """Verify that FastAPI successfully serves frontend SPA index.html when dist exists."""
+    response = client.get("/")
+    if os.path.exists("frontend/dist/index.html"):
+        assert response.status_code == 200
+        assert "<div id=\"root\">" in response.text or "vite" in response.text.lower()
+
+
 if __name__ == "__main__":
     print("Running automated API tests...")
     test_health_endpoint()
@@ -230,4 +238,6 @@ if __name__ == "__main__":
     print("[PASS] test_predict_mixed_units_rejection")
     test_predict_explicit_unit_system()
     print("[PASS] test_predict_explicit_unit_system")
-    print("\n[SUCCESS] ALL 10 API UNIT TESTS PASSED SUCCESSFULLY!")
+    test_spa_frontend_serving()
+    print("[PASS] test_spa_frontend_serving")
+    print("\n[SUCCESS] ALL 11 API & FULLSTACK UNIT TESTS PASSED SUCCESSFULLY!")

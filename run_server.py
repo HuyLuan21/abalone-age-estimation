@@ -18,7 +18,8 @@ if sys.platform == "win32":
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("🚀 Khởi động Abalone Age Estimation Backend API Server...")
+    print("🚀 Khởi động Abalone Age Estimation Fullstack Server (Backend + Frontend)...")
+    print("👉 Ứng dụng Web (Frontend UI)        : http://127.0.0.1:8000/")
     print("👉 Swagger UI (Tài liệu API tương tác): http://127.0.0.1:8000/docs")
     print("👉 ReDoc                              : http://127.0.0.1:8000/redoc")
     print("👉 Health Check Endpoint             : http://127.0.0.1:8000/api/health")
