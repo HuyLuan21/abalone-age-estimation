@@ -15,6 +15,7 @@ import sys
 # Ensure repository root is in python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import ast
 import json
 # pyrefly: ignore [missing-import]
 import joblib
@@ -173,6 +174,71 @@ def test_held_out_test_evaluation_protocol():
             assert row["Test_MAE"] > 0, "Test_MAE must be positive"
 
 
+def test_model_locking_precedence_over_test_evaluation():
+    """Verify strictly by AST and source analysis that artifact locking precedes any Test evaluation.
+
+    Asserts:
+    1. save_model_pipeline occurs before any prediction on X_test in main.py.
+    2. No baseline test evaluation touches y_test before save_model_pipeline.
+    3. No candidate model (alt_pipeline) calls .predict(X_test).
+    """
+    main_py_path = os.path.join(os.path.dirname(__file__), "..", "main.py")
+    with open(main_py_path, "r", encoding="utf-8") as f:
+        source_code = f.read()
+
+    tree = ast.parse(source_code)
+
+    save_pipeline_line = None
+    predict_x_test_lines = []
+    calculate_metrics_test_lines = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            # Check for save_model_pipeline
+            func_name = ""
+            if isinstance(node.func, ast.Name):
+                func_name = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                func_name = node.func.attr
+
+            if func_name == "save_model_pipeline":
+                save_pipeline_line = node.lineno
+
+            # Check for .predict(X_test)
+            if func_name == "predict":
+                for arg in node.args:
+                    if isinstance(arg, ast.Name) and arg.id == "X_test":
+                        caller = ""
+                        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+                            caller = node.func.value.id
+                        predict_x_test_lines.append((node.lineno, caller))
+
+            # Check for calculate_metrics with y_test
+            if func_name == "calculate_metrics":
+                for arg in node.args:
+                    if isinstance(arg, ast.Name) and arg.id == "y_test":
+                        calculate_metrics_test_lines.append(node.lineno)
+
+    assert save_pipeline_line is not None, "save_model_pipeline call not found in main.py!"
+
+    # 1. Assert that ALL .predict(X_test) calls occur strictly AFTER model locking
+    assert len(predict_x_test_lines) > 0, "No predict(X_test) found in main.py!"
+    for line_no, caller in predict_x_test_lines:
+        assert line_no > save_pipeline_line, (
+            f"predict(X_test) called at line {line_no} BEFORE save_model_pipeline at line {save_pipeline_line}!"
+        )
+        assert caller != "alt_pipeline", (
+            f"alt_pipeline.predict(X_test) called at line {line_no}! Candidate models must not evaluate on Test."
+        )
+
+    # 2. Assert that ALL calculate_metrics(y_test, ...) occur strictly AFTER model locking
+    assert len(calculate_metrics_test_lines) > 0, "No calculate_metrics(y_test) found in main.py!"
+    for line_no in calculate_metrics_test_lines:
+        assert line_no > save_pipeline_line, (
+            f"calculate_metrics(y_test) called at line {line_no} BEFORE save_model_pipeline at line {save_pipeline_line}!"
+        )
+
+
 if __name__ == "__main__":
     print("Running pipeline verification test suite...")
     test_anomaly_removal_and_sample_count()
@@ -191,5 +257,8 @@ if __name__ == "__main__":
     print("[PASS] test_metadata_consistency")
     test_held_out_test_evaluation_protocol()
     print("[PASS] test_held_out_test_evaluation_protocol")
+    test_model_locking_precedence_over_test_evaluation()
+    print("[PASS] test_model_locking_precedence_over_test_evaluation")
     print("\n[SUCCESS] ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!")
+
 

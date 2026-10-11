@@ -153,18 +153,14 @@ def run_pipeline(
         print("\n[3/8] Skipping EDA generation (--skip-eda flag enabled).")
 
     # 4. Baseline Modeling (Median of Train Rings Only)
-    print("\n[4/8] Evaluating Baseline (Median of Train Rings)...")
+    print("\n[4/8] Evaluating Baseline on Validation Set (Median of Train Rings)...")
     baseline_val = train_baseline_median(y_train)
 
     baseline_val_pred = np.full(shape=len(y_val), fill_value=baseline_val)
     baseline_val_metrics = calculate_metrics(y_val, baseline_val_pred)
 
-    baseline_test_pred = np.full(shape=len(y_test), fill_value=baseline_val)
-    baseline_test_metrics = calculate_metrics(y_test, baseline_test_pred)
-
-    print(f"  [OK] Median Baseline value : {baseline_val:.2f} rings")
+    print(f"  [OK] Median Baseline value  : {baseline_val:.2f} rings (learned strictly from y_train)")
     print(f"  [OK] Baseline Validation MAE: {baseline_val_metrics['MAE']:.4f}")
-    print(f"  [OK] Baseline Held-out Test MAE: {baseline_test_metrics['MAE']:.4f}")
 
     # 5. 5-Fold Cross-Validation on Training set (Hyperparameter Tuning & Ablation Study)
     print(f"\n[5/8] Running {cv_folds}-Fold Cross-Validation on Train (K=1..30, weights, scaling)...")
@@ -249,6 +245,13 @@ def run_pipeline(
     print("\n[7/8] Evaluating locked model independently on Held-out Test set (Final Evaluation)...")
     final_test_pred = primary_pipeline.predict(X_test)
     final_test_metrics = calculate_metrics(y_test, final_test_pred)
+
+    # Evaluate baseline benchmark on Test partition at the same time (strictly after model locking)
+    baseline_test_pred = np.full(shape=len(y_test), fill_value=baseline_val)
+    baseline_test_metrics = calculate_metrics(y_test, baseline_test_pred)
+
+    print(f"  [OK] Baseline Held-out Test MAE: {baseline_test_metrics['MAE']:.4f}")
+    print(f"  [OK] Locked Model Test MAE     : {final_test_metrics['MAE']:.4f} (RMSE: {final_test_metrics['RMSE']:.4f}, R2: {final_test_metrics['R2']:.4f})")
 
     # TUÂN THỦ NGUYÊN TẮC NIÊM PHONG TẬP TEST (ZERO DATA LEAKAGE PROTOCOL):
     # alt_pipeline TUYỆT ĐỐI KHÔNG được gọi trên tập Test.

@@ -32,10 +32,10 @@ TARGET_NAME = "Rings"
 
 # Specific row-level anomaly definitions (verified against raw UCI dataset)
 KNOWN_ANOMALIES_METADATA = {
-    1210: "Inconsistent geometry: Diameter (0.375) > Length (0.185). Length is by definition the maximum dimension.",
-    1257: "Biologically impossible: Height = 0.0 mm (shell height cannot be zero in living organism).",
-    2051: "Data entry outlier typo: Height = 1.130 mm (~10x sample mean 0.140, exceeds shell Length 0.455).",
-    3996: "Biologically impossible: Height = 0.0 mm (shell height cannot be zero in living organism).",
+    1210: "Inconsistent geometry: Diameter (0.375) > Length (0.185) on UCI scale (75.0 mm > 37.0 mm). Length is by definition the maximum dimension.",
+    1257: "Biologically impossible: Height = 0.0 on UCI scale (0.0 mm; living organism shell height cannot be zero).",
+    2051: "Data entry typo: Height = 1.130 on UCI scale (226.0 mm; ~8x population mean 0.140 / 28.0 mm, exceeds shell Length 0.455 / 91.0 mm).",
+    3996: "Biologically impossible: Height = 0.0 on UCI scale (0.0 mm; living organism shell height cannot be zero).",
 }
 
 
