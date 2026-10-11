@@ -1,0 +1,5 @@
+Raw_Row_Index,Sex,Length,Diameter,Height,Whole_weight,Shucked_weight,Viscera_weight,Shell_weight,Rings,Anomaly_Reason
+1210,I,0.185,0.375,0.12,0.4645,0.196,0.1045,0.15,6,Inconsistent geometry: Diameter (0.375) > Length (0.185). Length is by definition the maximum dimension.
+1257,I,0.43,0.34,0.0,0.428,0.2065,0.086,0.115,8,Biologically impossible: Height = 0.0 mm (shell height cannot be zero in living organism).
+2051,F,0.455,0.355,1.13,0.594,0.332,0.116,0.1335,8,"Data entry outlier typo: Height = 1.130 mm (~10x sample mean 0.140, exceeds shell Length 0.455)."
+3996,I,0.315,0.23,0.0,0.134,0.0575,0.0285,0.3505,6,Biologically impossible: Height = 0.0 mm (shell height cannot be zero in living organism).

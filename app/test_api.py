@@ -8,6 +8,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
 
 try:
@@ -53,7 +54,10 @@ def test_feature_ranges_endpoint():
     assert "numeric_ranges" in data
     assert "Length" in data["numeric_ranges"]
     assert "valid_sex_values" in data
-    assert data["total_training_samples"] == 3341
+    # 4,173 cleaned samples (4 anomalies filtered) -> 80% train = 3,338 samples
+    assert data["total_training_samples"] == 3338
+    assert "physical_unit" in data["numeric_ranges"]["Length"]
+    assert data["numeric_ranges"]["Length"]["physical_unit"] == "mm"
 
 
 def test_predict_valid_sample():
@@ -76,6 +80,28 @@ def test_predict_valid_sample():
     assert "age_group" in data
     assert "reference_interval" in data
     assert len(data["nearest_neighbors"]) > 0
+    assert data["estimated_age_years"] == round(data["predicted_rings"] + 1.5, 2)
+
+
+def test_predict_physical_units_sample():
+    """Test prediction endpoint with physical mm/g units (auto converted / 200)."""
+    # Physical: Length = 91.0 mm (=0.455 UCI), Diameter = 73.0 mm (=0.365 UCI),
+    # Height = 19.0 mm (=0.095 UCI), Whole_weight = 102.8 g (=0.514 UCI)
+    sample = {
+        "Sex": "M",
+        "Length": 91.0,
+        "Diameter": 73.0,
+        "Height": 19.0,
+        "Whole_weight": 102.8,
+        "Shucked_weight": 44.9,
+        "Viscera_weight": 20.2,
+        "Shell_weight": 30.0,
+    }
+    response = client.post("/api/predict", json=sample)
+    assert response.status_code == 200
+    data = response.json()
+    assert "predicted_rings" in data
+    assert "estimated_age_years" in data
     assert data["estimated_age_years"] == round(data["predicted_rings"] + 1.5, 2)
 
 
@@ -140,10 +166,12 @@ if __name__ == "__main__":
     print("[PASS] test_feature_ranges_endpoint")
     test_predict_valid_sample()
     print("[PASS] test_predict_valid_sample")
+    test_predict_physical_units_sample()
+    print("[PASS] test_predict_physical_units_sample")
     test_predict_out_of_distribution_warning()
     print("[PASS] test_predict_out_of_distribution_warning")
     test_predict_invalid_diameter_greater_than_length()
     print("[PASS] test_predict_invalid_diameter_greater_than_length")
     test_predict_invalid_negative_measurement()
     print("[PASS] test_predict_invalid_negative_measurement")
-    print("\n[SUCCESS] ALL 7 API UNIT TESTS PASSED SUCCESSFULLY!")
+    print("\n[SUCCESS] ALL 8 API UNIT TESTS PASSED SUCCESSFULLY!")

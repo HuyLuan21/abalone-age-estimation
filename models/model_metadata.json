@@ -3,8 +3,8 @@
   "algorithm": "K-Nearest Neighbors Regressor with Euclidean Distance",
   "dataset_source": "UCI Machine Learning Repository (DOI: 10.24432/C55C7W)",
   "intended_use": "Hỗ trợ nghiên cứu nuôi trồng và sàng lọc mẫu bào ngư cần kiểm tra vi thể.",
-  "total_training_samples": 3341,
-  "total_test_samples": 836,
+  "total_training_samples": 3338,
+  "total_test_samples": 835,
   "valid_sex_values": [
     "F",
     "I",
@@ -13,10 +13,10 @@
   "pipeline_steps": [
     "StandardScaler (7 numerical features)",
     "OneHotEncoder (Sex categorical feature)",
-    "KNeighborsRegressor(n_neighbors=27, weights='distance')"
+    "KNeighborsRegressor(n_neighbors=25, weights='distance')"
   ],
   "hyperparameters": {
-    "n_neighbors": 27,
+    "n_neighbors": 25,
     "weights": "distance",
     "metric": "minkowski (p=2 Euclidean)",
     "scaling": "StandardScaler",
@@ -24,25 +24,25 @@
     "random_state": 42
   },
   "cv_performance": {
-    "best_scaled_cv_mae": 1.5398,
-    "best_scaled_cv_std": 0.0456,
-    "best_unscaled_cv_mae": 1.5181,
-    "best_unscaled_cv_std": 0.049
+    "best_scaled_cv_mae": 1.5275,
+    "best_scaled_cv_std": 0.0443,
+    "best_unscaled_cv_mae": 1.5022,
+    "best_unscaled_cv_std": 0.0427
   },
   "performance_metrics": {
-    "Test_MAE": 1.5507,
-    "Test_RMSE": 2.2586,
-    "Test_R2": 0.5288,
-    "Baseline_Median_MAE": 2.378
+    "Test_MAE": 1.5549,
+    "Test_RMSE": 2.3335,
+    "Test_R2": 0.5453,
+    "Baseline_Median_MAE": 2.5401
   },
   "age_group_mae": {
-    "Young (<=8 rings)": 1.1136,
-    "Middle (9-12 rings)": 1.1249,
-    "Old (>12 rings)": 3.8453
+    "Young (<=8 rings)": 1.0278,
+    "Middle (9-12 rings)": 1.0041,
+    "Old (>12 rings)": 3.8916
   },
   "limitations": [
-    "Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = 1.114) và trung bình (MAE = 1.125).",
-    "Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = 3.845) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
+    "Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = 1.028) và trung bình (MAE = 1.004).",
+    "Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = 3.892) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
     "Quy trình so sánh mô hình (Scaling vs No-Scale) được chọn dựa trên 5-Fold Cross-Validation trên Train để bảo đảm không rò rỉ tập Test.",
     "Ước lượng hỗ trợ sàng lọc sơ bộ, không thay thế quy trình cắt vỏ và đếm vòng kính hiển vi tiêu chuẩn."
   ],
@@ -52,56 +52,56 @@
       "desc": "Chiều dài lớn nhất của vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
       "min": 0.075,
       "max": 0.815,
-      "mean": 0.525,
-      "std": 0.1191
+      "mean": 0.5253,
+      "std": 0.1183
     },
     "Diameter": {
       "unit": "mm",
       "desc": "Đường kính vuông góc với chiều dài (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
       "min": 0.055,
       "max": 0.65,
-      "mean": 0.4085,
-      "std": 0.0987
+      "mean": 0.4088,
+      "std": 0.0978
     },
     "Height": {
       "unit": "mm",
       "desc": "Chiều cao kèm thịt trong vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
-      "min": 0.0,
-      "max": 1.13,
-      "mean": 0.1398,
-      "std": 0.0425
+      "min": 0.01,
+      "max": 0.515,
+      "mean": 0.1395,
+      "std": 0.0385
     },
     "Whole_weight": {
       "unit": "g",
       "desc": "Tổng khối lượng toàn bộ cá thể (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
       "min": 0.002,
       "max": 2.8255,
-      "mean": 0.8308,
-      "std": 0.4916
+      "mean": 0.8317,
+      "std": 0.4899
     },
     "Shucked_weight": {
       "unit": "g",
       "desc": "Khối lượng phần thịt (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
       "min": 0.001,
       "max": 1.488,
-      "mean": 0.3606,
-      "std": 0.223
+      "mean": 0.3615,
+      "std": 0.2231
     },
     "Viscera_weight": {
       "unit": "g",
       "desc": "Khối lượng nội tạng sau khi mổ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
       "min": 0.0005,
       "max": 0.76,
-      "mean": 0.1808,
-      "std": 0.1094
+      "mean": 0.1814,
+      "std": 0.1098
     },
     "Shell_weight": {
       "unit": "g",
       "desc": "Khối lượng vỏ sấy khô (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
       "min": 0.0015,
       "max": 1.005,
-      "mean": 0.2397,
-      "std": 0.1399
+      "mean": 0.2392,
+      "std": 0.1385
     }
   }
 }

@@ -1,6 +1,6 @@
 # Hồ sơ Dữ liệu Abalone (Data Dossier)
 
-Tài liệu hồ sơ dữ liệu bắt buộc theo quy chuẩn của đề tài nghiên cứu (Mục 65 trong đề tài giao nhiệm vụ).
+Tài liệu hồ sơ dữ liệu bắt buộc theo quy chuẩn của đề tài nghiên cứu (Mục 65–67 trong đề tài giao nhiệm vụ).
 
 ---
 
@@ -29,9 +29,10 @@ Tệp dữ liệu sử dụng trực tiếp trong dự án được lưu tại `
 
 ---
 
-## 3. Báo cáo chất lượng dữ liệu (Data Quality Summary)
+## 3. Báo cáo chất lượng dữ liệu & Quy tắc xử lý dữ liệu bất thường (Mục 67)
 
-- **Giá trị khuyết thiếu (Missing values):** **0** (không có bất kỳ giá trị NaN / Null nào).
+### 3.1. Thống kê tập dữ liệu thô (Raw Data - 4,177 mẫu)
+- **Giá trị khuyết thiếu (Missing values):** **0** (không có giá trị NaN / Null).
 - **Dòng trùng lặp hoàn toàn (Duplicate rows):** **0** dòng.
 - **Phân bố giới tính (`Sex`):**
   - `M` (Male): 1,528 mẫu (36.58%)
@@ -42,17 +43,29 @@ Tệp dữ liệu sử dụng trực tiếp trong dự án được lưu tại `
   - Giá trị lớn nhất (Max): 29 vòng (~30.5 tuổi)
   - Giá trị trung vị (Median): 9.0 vòng (~10.5 tuổi)
   - Giá trị trung bình (Mean): 9.93 vòng ($\pm 3.22$)
-- **Ngoại lệ vật lý cần chú ý:** Có 2 mẫu trong dữ liệu gốc có `Height = 0` (mã 1258 và 3996); các mẫu này được giữ nguyên để bảo đảm tính khách quan của dữ liệu gốc khi thực hiện k-NN (hoặc được cảnh báo qua bộ lọc OOD).
+
+### 3.2. Quy tắc loại bỏ 04 quan sát bất thường trước khi chia tập
+Theo đúng yêu cầu tại Mục 67 của đề tài *(báo cáo chất lượng và danh sách mọi dòng bị loại kèm lý do)*, đúng **04 dòng dữ liệu vi phạm vật lý và lỗi ghi chép** đã được xác định và loại bỏ trước khi chia Train/Test, lưu bảng theo dõi tại [`reports/removed_anomalies.csv`](../reports/removed_anomalies.csv):
+
+| Chỉ số dòng gốc | Thuộc tính vi phạm | Giá trị ghi nhận | Lý do khoa học loại bỏ |
+| :---: | :--- | :--- | :--- |
+| **1210** | `Diameter > Length` | `Diameter = 0.375`, `Length = 0.185` | Vi phạm hình học vỏ bào ngư: Chiều dài theo định nghĩa là trục đo lớn nhất. |
+| **1257** | `Height == 0` | `Height = 0.0` mm | Phi sinh học: Cá thể bào ngư sống không thể có chiều cao vỏ bằng 0. |
+| **2051** | `Height` ngoại lệ cực đoan | `Height = 1.130` mm | Lỗi nhập liệu (outlier typo): Chiều cao lớn gấp gần 10 lần trung bình (0.14) và lớn hơn cả chiều dài (0.455). |
+| **3996** | `Height == 0` | `Height = 0.0` mm | Phi sinh học: Cá thể bào ngư sống không thể có chiều cao vỏ bằng 0. |
+
+### 3.3. Tập dữ liệu sạch đưa vào mô hình (Cleaned Data - 4,173 mẫu)
+- **Tổng số quan sát:** **4,173 mẫu** (loại đúng 4 dòng nêu trên).
+- **Tính toàn vẹn vật lý:** Toàn bộ các phép đo đều strictly positive ($> 0$), `Height` dao động trong khoảng hợp lý $[0.010, 0.515]$, `Diameter` $\le$ `Length`.
+- **Phân chia tập độc lập:** Tập Train 80% (**3,338 mẫu**) và tập Test 20% (**835 mẫu**), bảo đảm không rò rỉ dữ liệu.
 
 ---
 
-## 4. Hướng dẫn tái tạo / Tải dữ liệu
+## 4. Hướng dẫn tải & Tái lập dữ liệu từ đầu
 
-Để tải lại tệp từ kho lưu trữ UCI chính thức bằng script tự động:
+Dự án cung cấp script tự động tải dữ liệu gốc từ kho UCI và kiểm tra mã băm SHA-256:
 
-```python
-import urllib.request
-url = "https://archive.ics.uci.edu/static/public/1/abalone.zip"
-# hoặc tải trực tiếp data thô:
-# https://archive.ics.uci.edu/ml/machine-learning-databases/abalone/abalone.data
+```powershell
+python src/download_data.py
 ```
+Script sẽ tự động tải `abalone.data`, đối chiếu mã băm MD5/SHA-256 và thông báo nếu tệp bị sai lệch.

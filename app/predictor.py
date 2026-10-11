@@ -9,7 +9,9 @@ import os
 import sys
 import warnings
 from typing import Dict, List, Tuple, Any
+# pyrefly: ignore [missing-import]
 import joblib
+# pyrefly: ignore [missing-import]
 import numpy as np
 import pandas as pd
 
@@ -360,17 +362,26 @@ class AbalonePredictor:
 
     def get_dataset_stats(self) -> DatasetStatsResponse:
         """Return dataset boundaries and descriptions for client form validation."""
-        numeric_ranges = {
-            k: FeatureRangeItem(
-                unit=v.get("unit", "-"),
+        numeric_ranges = {}
+        for k, v in self.feature_stats.items():
+            u = v.get("unit", "-")
+            min_v = float(v.get("min", 0.0))
+            max_v = float(v.get("max", 5.0))
+            mean_v = float(v.get("mean", 0.0))
+            std_v = float(v.get("std", 1.0))
+            phys_u = "g" if "weight" in k.lower() else "mm"
+            numeric_ranges[k] = FeatureRangeItem(
+                unit=u,
                 description=v.get("desc", k),
-                min=float(v.get("min", 0.0)),
-                max=float(v.get("max", 5.0)),
-                mean=float(v.get("mean", 0.0)),
-                std=float(v.get("std", 1.0)),
+                min=min_v,
+                max=max_v,
+                mean=mean_v,
+                std=std_v,
+                physical_unit=phys_u,
+                physical_min=round(min_v * 200, 2),
+                physical_max=round(max_v * 200, 2),
+                physical_mean=round(mean_v * 200, 2),
             )
-            for k, v in self.feature_stats.items()
-        }
         return DatasetStatsResponse(
             numeric_ranges=numeric_ranges,
             valid_sex_values=self.valid_sex_values,
