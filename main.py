@@ -250,15 +250,16 @@ def run_pipeline(
     final_test_pred = primary_pipeline.predict(X_test)
     final_test_metrics = calculate_metrics(y_test, final_test_pred)
 
-    alt_test_pred = alt_pipeline.predict(X_test)
-    alt_test_metrics = calculate_metrics(y_test, alt_test_pred)
+    # TUÂN THỦ NGUYÊN TẮC NIÊM PHONG TẬP TEST (ZERO DATA LEAKAGE PROTOCOL):
+    # alt_pipeline TUYỆT ĐỐI KHÔNG được gọi trên tập Test.
+    # Việc đối sánh giữa No Scale và StandardScaler đã được hoàn thành khách quan tại bước 5-Fold CV và Validation Set.
+    # Tập Test chỉ mở đúng 1 lần duy nhất để báo cáo hiệu năng mô hình đã chốt (primary_pipeline).
 
     # Assemble comprehensive results table with both Validation and Test metrics
-    test_records = []
-    # Baseline
-    test_records.append(
+    test_records = [
         {
             "Model": "Median Baseline",
+            "Selection_Stage": "Baseline Benchmark",
             "Val_MAE": baseline_val_metrics["MAE"],
             "Val_RMSE": baseline_val_metrics["RMSE"],
             "Val_R2": baseline_val_metrics["R2"],
@@ -268,66 +269,34 @@ def run_pipeline(
             "MAE": baseline_test_metrics["MAE"],
             "RMSE": baseline_test_metrics["RMSE"],
             "R2": baseline_test_metrics["R2"],
-        }
-    )
-    if with_scaling:
-        test_records.append(
-            {
-                "Model": "KNN - No Scale",
-                "Val_MAE": alt_val_metrics["MAE"],
-                "Val_RMSE": alt_val_metrics["RMSE"],
-                "Val_R2": alt_val_metrics["R2"],
-                "Test_MAE": alt_test_metrics["MAE"],
-                "Test_RMSE": alt_test_metrics["RMSE"],
-                "Test_R2": alt_test_metrics["R2"],
-                "MAE": alt_test_metrics["MAE"],
-                "RMSE": alt_test_metrics["RMSE"],
-                "R2": alt_test_metrics["R2"],
-            }
-        )
-        test_records.append(
-            {
-                "Model": "KNN - StandardScaler",
-                "Val_MAE": primary_val_metrics["MAE"],
-                "Val_RMSE": primary_val_metrics["RMSE"],
-                "Val_R2": primary_val_metrics["R2"],
-                "Test_MAE": final_test_metrics["MAE"],
-                "Test_RMSE": final_test_metrics["RMSE"],
-                "Test_R2": final_test_metrics["R2"],
-                "MAE": final_test_metrics["MAE"],
-                "RMSE": final_test_metrics["RMSE"],
-                "R2": final_test_metrics["R2"],
-            }
-        )
-    else:
-        test_records.append(
-            {
-                "Model": "KNN - No Scale",
-                "Val_MAE": primary_val_metrics["MAE"],
-                "Val_RMSE": primary_val_metrics["RMSE"],
-                "Val_R2": primary_val_metrics["R2"],
-                "Test_MAE": final_test_metrics["MAE"],
-                "Test_RMSE": final_test_metrics["RMSE"],
-                "Test_R2": final_test_metrics["R2"],
-                "MAE": final_test_metrics["MAE"],
-                "RMSE": final_test_metrics["RMSE"],
-                "R2": final_test_metrics["R2"],
-            }
-        )
-        test_records.append(
-            {
-                "Model": "KNN - StandardScaler",
-                "Val_MAE": alt_val_metrics["MAE"],
-                "Val_RMSE": alt_val_metrics["RMSE"],
-                "Val_R2": alt_val_metrics["R2"],
-                "Test_MAE": alt_test_metrics["MAE"],
-                "Test_RMSE": alt_test_metrics["RMSE"],
-                "Test_R2": alt_test_metrics["R2"],
-                "MAE": alt_test_metrics["MAE"],
-                "RMSE": alt_test_metrics["RMSE"],
-                "R2": alt_test_metrics["R2"],
-            }
-        )
+        },
+        {
+            "Model": f"KNN - {best_scaling} (Selected & Locked)",
+            "Selection_Stage": "Selected by CV & Locked on Val",
+            "Val_MAE": primary_val_metrics["MAE"],
+            "Val_RMSE": primary_val_metrics["RMSE"],
+            "Val_R2": primary_val_metrics["R2"],
+            "Test_MAE": final_test_metrics["MAE"],
+            "Test_RMSE": final_test_metrics["RMSE"],
+            "Test_R2": final_test_metrics["R2"],
+            "MAE": final_test_metrics["MAE"],
+            "RMSE": final_test_metrics["RMSE"],
+            "R2": final_test_metrics["R2"],
+        },
+        {
+            "Model": f"KNN - {'StandardScaler' if not with_scaling else 'No Scale'} (Ablation Candidate)",
+            "Selection_Stage": "Eliminated on Validation",
+            "Val_MAE": alt_val_metrics["MAE"],
+            "Val_RMSE": alt_val_metrics["RMSE"],
+            "Val_R2": alt_val_metrics["R2"],
+            "Test_MAE": np.nan,
+            "Test_RMSE": np.nan,
+            "Test_R2": np.nan,
+            "MAE": np.nan,
+            "RMSE": np.nan,
+            "R2": np.nan,
+        },
+    ]
 
     results_df = pd.DataFrame(test_records)
     plot_model_comparison(results_df, "reports/figures/model_comparison.png")

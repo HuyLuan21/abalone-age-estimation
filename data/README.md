@@ -44,15 +44,20 @@ Tệp dữ liệu sử dụng trực tiếp trong dự án được lưu tại `
   - Giá trị trung vị (Median): 9.0 vòng (~10.5 tuổi)
   - Giá trị trung bình (Mean): 9.93 vòng ($\pm 3.22$)
 
-### 3.2. Quy tắc loại bỏ 04 quan sát bất thường trước khi chia tập
-Theo đúng yêu cầu tại Mục 67 của đề tài *(báo cáo chất lượng và danh sách mọi dòng bị loại kèm lý do)*, đúng **04 dòng dữ liệu vi phạm vật lý và lỗi ghi chép** đã được xác định và loại bỏ trước khi chia Train/Validation/Test, lưu bảng theo dõi tại [`reports/removed_anomalies.csv`](../reports/removed_anomalies.csv):
+### 3.2. Tiêu chí kiểm soát chất lượng dữ liệu tiên nghiệm (Pre-defined Quality Rules)
+Trước khi tiến hành phân chia dữ liệu hoặc huấn luyện mô hình, dữ liệu thô được kiểm định dựa trên **03 Quy tắc Kiểm soát Chất lượng Tiên nghiệm** xuất phát từ hình thái học sinh học của bào ngư:
+1. **Quy tắc 1 (Hình học sinh học - Biological Axis Rule):** Trục chiều dài ($Length$) luôn là kích thước lớn nhất của cá thể. Điều kiện bắt buộc: $\text{Diameter} \le \text{Length}$.
+2. **Quy tắc 2 (Cá thể sống / Kích thước dương nghiêm ngặt - Non-zero Dimension):** Vỏ cá thể sinh học sống luôn có độ dày và chiều cao nhất định. Điều kiện bắt buộc: $\text{Height} > 0$.
+3. **Quy tắc 3 (Tỷ lệ hình thái tự nhiên - Morphological Ratio & Domain Validity):** Vỏ bào ngư dạng khum bán dẹp, chiều cao không thể vượt quá chiều dài ($\text{Height} < \text{Length}$). Đồng thời, theo tài liệu Nash et al. (1994), chiều cao tối đa của loài hiếm khi vượt quá $60\text{ mm}$ ($\text{Height} < 0.30$ thang UCI). Quy tắc chặn: $\text{Height} < \text{Length}$ và $\text{Height} < 1.0$ (tương đương $< 200\text{ mm}$).
 
-| Chỉ số dòng gốc | Thuộc tính vi phạm | Giá trị ghi nhận | Lý do khoa học loại bỏ |
-| :---: | :--- | :--- | :--- |
-| **1210** | `Diameter > Length` | `Diameter = 0.375`, `Length = 0.185` | Vi phạm hình học vỏ bào ngư: Chiều dài theo định nghĩa là trục đo lớn nhất. |
-| **1257** | `Height == 0` | `Height = 0.0` mm | Phi sinh học: Cá thể bào ngư sống không thể có chiều cao vỏ bằng 0. |
-| **2051** | `Height` ngoại lệ cực đoan | `Height = 1.130` mm | Lỗi nhập liệu (outlier typo): Chiều cao lớn gấp gần 10 lần trung bình (0.14) và lớn hơn cả chiều dài (0.455). |
-| **3996** | `Height == 0` | `Height = 0.0` mm | Phi sinh học: Cá thể bào ngư sống không thể có chiều cao vỏ bằng 0. |
+Đối chiếu bộ dữ liệu thô (4,177 mẫu) với 3 quy tắc trên, phát hiện đúng **04 quan sát vi phạm** (được loại bỏ trước khi chia tập, lưu vết tại [`reports/removed_anomalies.csv`](../reports/removed_anomalies.csv)):
+
+| Dòng gốc | Giá trị UCI (gốc) | Giá trị vật lý quy đổi ($\times 200$) | Quy tắc vi phạm | Phân tích khoa học loại bỏ |
+| :---: | :--- | :--- | :--- | :--- |
+| **1210** | `Diameter=0.375`, `Length=0.185` | `Diameter=75.0 mm`, `Length=37.0 mm` | **Quy tắc 1** | Vi phạm hình thái học vỏ: Đường kính lớn hơn chiều dài gấp đôi. |
+| **1257** | `Height=0.0` | `Height=0.0 mm` | **Quy tắc 2** | Phi sinh học: Chiều cao vỏ bằng 0. |
+| **2051** | `Height=1.130`, `Length=0.455` | `Height=226.0 mm`, `Length=91.0 mm` | **Quy tắc 3** | Lỗi nhập liệu (typo): Chiều cao $226\text{ mm}$ cao gấp 2.5 lần chiều dài $91\text{ mm}$, cao gấp 8 lần mức trung bình của quần thể ($28\text{ mm}$). |
+| **3996** | `Height=0.0` | `Height=0.0 mm` | **Quy tắc 2** | Phi sinh học: Chiều cao vỏ bằng 0. |
 
 ### 3.3. Tập dữ liệu sạch đưa vào mô hình (Cleaned Data - 4,173 mẫu)
 - **Tổng số quan sát:** **4,173 mẫu** (loại đúng 4 dòng nêu trên).

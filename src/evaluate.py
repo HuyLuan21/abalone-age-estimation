@@ -179,17 +179,17 @@ def plot_model_comparison(
 ) -> None:
     """Plot bar chart comparing model metrics on test set."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    plt.figure(figsize=(9, 6))
-
-    x = np.arange(len(results_df))
+    valid_df = results_df.dropna(subset=["R2"]).copy()
+    x = np.arange(len(valid_df))
+    colors = ["#94a3b8", "#10b981"] if len(valid_df) == 2 else ["#94a3b8", "#f59e0b", "#10b981"][:len(valid_df)]
     plt.bar(
         x,
-        results_df["R2"],
-        color=["#94a3b8", "#f59e0b", "#10b981"],
+        valid_df["R2"],
+        color=colors,
         edgecolor="black",
         width=0.55,
     )
-    plt.xticks(x, results_df["Model"], rotation=15, fontsize=11)
+    plt.xticks(x, valid_df["Model"], rotation=15, fontsize=11)
     plt.ylabel("R² Score", fontsize=12)
     plt.title("Model Performance Comparison (R² Score on Test Set)", fontsize=14, fontweight="bold")
     plt.axhline(0, color="gray", linewidth=1)

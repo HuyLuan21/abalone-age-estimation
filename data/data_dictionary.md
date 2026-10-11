@@ -33,3 +33,11 @@ Tài liệu từ điển dữ liệu đặc tả chi tiết 9 trường thông t
      * Tất cả các giá trị đo vật lý đều dương nghiêm ngặt ($> 0$).
      * Đường kính vỏ luôn nhỏ hơn hoặc bằng chiều dài vỏ (`Diameter <= Length`).
      * Không có giá trị ngoại lệ phi sinh học (`Height` dao động an toàn trong khoảng $(0.0, 0.6)$ theo thang UCI, tương ứng $(0, 120)\text{ mm}$).
+
+4. **Quy ước Hệ quy chiếu & Mẫu ngoại lai ngoài phân bố (OOD - Out-of-Distribution):**
+   - **Mẫu vật lý (Physical unit system):** Sử dụng đơn vị thực nghiệm milimét (mm) và gam (g). Đây là định dạng đo thực địa ngoài tự nhiên và là định dạng thân thiện cho chuyên gia nhập liệu trên Web UI.
+   - **Mẫu chuẩn UCI (UCI normalized system):** Dữ liệu chuẩn lưu trong `abalone.data`, có được bằng công thức: $\text{Giá trị UCI} = \text{Giá trị vật lý (mm, g)} \div 200$. Đây là không gian vector chính thức mà mô hình K-NN học và tính khoảng cách Euclidean.
+   - **Mẫu OOD (Out-of-Distribution):** Là các mẫu quan sát nằm ngoài phân bố dữ liệu huấn luyện hoặc vi phạm tính hợp lý vật lý sinh học. Hệ thống tự động kích hoạt cảnh báo OOD khi:
+     * Vi phạm logic hình học: $Diameter > Length$, hoặc $Height \le 0$, hoặc $\sum \text{khối lượng thành phần} > Whole\_weight$.
+     * Ngoại lai thống kê cực đoan: Bất kỳ thuộc tính nào vượt quá giới hạn $[ \min - 3\sigma, \max + 3\sigma ]$ của quần thể huấn luyện.
+     Khi gặp mẫu OOD, hệ thống gắn nhãn cảnh báo để bảo đảm an toàn, không đưa ra kết luận thiếu căn cứ.

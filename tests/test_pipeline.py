@@ -149,6 +149,30 @@ def test_metadata_consistency():
     assert meta["system_environment"]["sklearn_version"] is not None
 
 
+def test_held_out_test_evaluation_protocol():
+    """Verify that Test metrics are strictly reserved for the locked primary model and baseline.
+
+    Ablation candidate models must remain un-evaluated on Test (NaN/null) to prevent multiple
+    hypothesis testing and data leakage on the held-out partition.
+    """
+    results_path = "reports/model_results.csv"
+    if os.path.exists(results_path):
+        df_res = pd.read_csv(results_path)
+        # Identify rows for candidate models
+        ablation_rows = df_res[df_res["Model"].str.contains("Ablation Candidate|StandardScaler", case=False, na=False)]
+        for _, row in ablation_rows.iterrows():
+            if "Ablation Candidate" in str(row.get("Selection_Stage", "")):
+                assert pd.isna(row["Test_MAE"]), "Ablation candidate model must NOT have Test_MAE evaluated!"
+                assert pd.isna(row["Test_R2"]), "Ablation candidate model must NOT have Test_R2 evaluated!"
+
+        # Identify locked model
+        locked_rows = df_res[df_res["Model"].str.contains("Locked Final Model|Selected & Locked", case=False, na=False)]
+        assert len(locked_rows) >= 1, "Must contain locked model row in results"
+        for _, row in locked_rows.iterrows():
+            assert not pd.isna(row["Test_MAE"]), "Locked model must have valid Test_MAE!"
+            assert row["Test_MAE"] > 0, "Test_MAE must be positive"
+
+
 if __name__ == "__main__":
     print("Running pipeline verification test suite...")
     test_anomaly_removal_and_sample_count()
@@ -165,4 +189,7 @@ if __name__ == "__main__":
     print("[PASS] test_model_artifact_load_and_predict")
     test_metadata_consistency()
     print("[PASS] test_metadata_consistency")
+    test_held_out_test_evaluation_protocol()
+    print("[PASS] test_held_out_test_evaluation_protocol")
     print("\n[SUCCESS] ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!")
+
