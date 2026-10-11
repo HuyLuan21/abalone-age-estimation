@@ -236,6 +236,17 @@ function formatApiError(detail: unknown): string {
   return 'Không thể thực hiện yêu cầu với dữ liệu hiện tại.'
 }
 
+function formatOodWarning(warning: string): { message: string; usesNormalizedValues: boolean } {
+  const message = warning
+    .replace(/(\d)\s*(?:mm|g)\b/gi, '$1')
+    .replace(/\s+\./g, '.')
+
+  return {
+    message,
+    usesNormalizedValues: message !== warning,
+  }
+}
+
 function MetricCard({ label, value, hint, icon, tone = 'neutral' }: MetricCardProps) {
   return (
     <div className={`stat-card ${tone}`}>
@@ -854,9 +865,20 @@ function App() {
                       Cảnh báo dữ liệu ngoài miền ({prediction.warnings.length})
                     </summary>
                     {prediction.warnings.length > 0 ? (
-                      <ul>
-                        {prediction.warnings.map((warning) => <li key={warning}>{warning}</li>)}
-                      </ul>
+                      <>
+                        <ul>
+                          {prediction.warnings.map((warning) => {
+                            const formatted = formatOodWarning(warning)
+                            return <li key={warning}>{formatted.message}</li>
+                          })}
+                        </ul>
+                        {prediction.warnings.some((warning) => formatOodWarning(warning).usesNormalizedValues) ? (
+                          <p className="ood-unit-note">
+                            Các giá trị trong cảnh báo được API tính trên payload thang UCI đã chia 200.
+                            Đơn vị vật lý tương ứng được quy đổi bằng cách nhân 200 (mm cho kích thước, g cho khối lượng).
+                          </p>
+                        ) : null}
+                      </>
                     ) : (
                       <p>API đánh dấu mẫu ngoài miền nhưng không trả về nội dung cảnh báo chi tiết.</p>
                     )}
