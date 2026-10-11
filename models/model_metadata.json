@@ -3,19 +3,38 @@
   "algorithm": "K-Nearest Neighbors Regressor with Euclidean Distance",
   "dataset_source": "UCI Machine Learning Repository (DOI: 10.24432/C55C7W)",
   "intended_use": "Hỗ trợ nghiên cứu nuôi trồng và sàng lọc mẫu bào ngư cần kiểm tra vi thể.",
-  "total_training_samples": 3338,
-  "total_test_samples": 835,
+  "data_split": {
+    "train_samples": 2921,
+    "validation_samples": 626,
+    "test_samples": 626,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "total_clean_samples": 4173,
+    "removed_anomalies": 4
+  },
+  "total_training_samples": 2921,
+  "total_validation_samples": 626,
+  "total_test_samples": 626,
   "valid_sex_values": [
     "F",
     "I",
     "M"
   ],
+  "system_environment": {
+    "python_version": "3.14.6",
+    "platform": "win32",
+    "sklearn_version": "1.9.1",
+    "numpy_version": "2.5.3",
+    "pandas_version": "3.0.6"
+  },
   "pipeline_steps": [
     "OneHotEncoder (Sex categorical feature)",
-    "KNeighborsRegressor(n_neighbors=19, weights='distance')"
+    "KNeighborsRegressor(n_neighbors=17, weights='distance')"
   ],
   "hyperparameters": {
-    "n_neighbors": 19,
+    "n_neighbors": 17,
     "weights": "distance",
     "metric": "minkowski (p=2 Euclidean)",
     "scaling": "No Scale",
@@ -23,84 +42,121 @@
     "random_state": 42
   },
   "cv_performance": {
-    "best_scaled_cv_mae": 1.5275,
-    "best_scaled_cv_std": 0.0443,
-    "best_unscaled_cv_mae": 1.5022,
-    "best_unscaled_cv_std": 0.0427
+    "best_scaled_cv_mae": 1.536,
+    "best_scaled_cv_std": 0.0395,
+    "best_unscaled_cv_mae": 1.5213,
+    "best_unscaled_cv_std": 0.057,
+    "selected_cv_mae": 1.5213,
+    "selected_cv_std": 0.057
+  },
+  "validation_performance": {
+    "Validation_MAE": 1.4564,
+    "Validation_RMSE": 2.1468,
+    "Validation_R2": 0.5394,
+    "Baseline_Validation_MAE": 2.3674
   },
   "performance_metrics": {
-    "Test_MAE": 1.5223,
-    "Test_RMSE": 2.2742,
-    "Test_R2": 0.5681,
-    "Baseline_Median_MAE": 2.5401
+    "Test_MAE": 1.5063,
+    "Test_RMSE": 2.2778,
+    "Test_R2": 0.5741,
+    "Baseline_Median_MAE": 2.5655
   },
   "age_group_mae": {
-    "Young (<=8 rings)": 1.0486,
-    "Middle (9-12 rings)": 1.0016,
-    "Old (>12 rings)": 3.6879
+    "Young (<=8 rings)": 1.0343,
+    "Middle (9-12 rings)": 0.932,
+    "Old (>12 rings)": 3.7318
   },
   "limitations": [
-    "Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = 1.049) và trung bình (MAE = 1.002).",
-    "Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = 3.688) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
+    "Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = 1.034) và trung bình (MAE = 0.932).",
+    "Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = 3.732) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
     "Quy trình so sánh mô hình (Scaling vs No-Scale) được chọn dựa trên 5-Fold Cross-Validation trên Train để bảo đảm không rò rỉ tập Test.",
+    "Tập Validation độc lập xác nhận hiệu năng mô hình trước khi đánh giá một lần duy nhất trên tập Test.",
     "Ước lượng hỗ trợ sàng lọc sơ bộ, không thay thế quy trình cắt vỏ và đếm vòng kính hiển vi tiêu chuẩn."
   ],
   "feature_statistics": {
     "Length": {
-      "unit": "mm",
       "desc": "Chiều dài lớn nhất của vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
+      "unit": "UCI scale (đã chia 200)",
       "min": 0.075,
-      "max": 0.815,
-      "mean": 0.5253,
-      "std": 0.1183
+      "max": 0.8,
+      "mean": 0.5249,
+      "std": 0.1189,
+      "physical_unit": "mm",
+      "physical_min": 15.0,
+      "physical_max": 160.0,
+      "physical_mean": 104.98
     },
     "Diameter": {
-      "unit": "mm",
       "desc": "Đường kính vuông góc với chiều dài (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
+      "unit": "UCI scale (đã chia 200)",
       "min": 0.055,
-      "max": 0.65,
-      "mean": 0.4088,
-      "std": 0.0978
+      "max": 0.63,
+      "mean": 0.4083,
+      "std": 0.0982,
+      "physical_unit": "mm",
+      "physical_min": 11.0,
+      "physical_max": 126.0,
+      "physical_mean": 81.66
     },
     "Height": {
-      "unit": "mm",
       "desc": "Chiều cao kèm thịt trong vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
+      "unit": "UCI scale (đã chia 200)",
       "min": 0.01,
       "max": 0.515,
-      "mean": 0.1395,
-      "std": 0.0385
+      "mean": 0.1394,
+      "std": 0.0389,
+      "physical_unit": "mm",
+      "physical_min": 2.0,
+      "physical_max": 103.0,
+      "physical_mean": 27.88
     },
     "Whole_weight": {
-      "unit": "g",
       "desc": "Tổng khối lượng toàn bộ cá thể (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+      "unit": "UCI scale (đã chia 200)",
       "min": 0.002,
       "max": 2.8255,
-      "mean": 0.8317,
-      "std": 0.4899
+      "mean": 0.8302,
+      "std": 0.4919,
+      "physical_unit": "g",
+      "physical_min": 0.4,
+      "physical_max": 565.1,
+      "physical_mean": 166.04
     },
     "Shucked_weight": {
-      "unit": "g",
       "desc": "Khối lượng phần thịt (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+      "unit": "UCI scale (đã chia 200)",
       "min": 0.001,
       "max": 1.488,
-      "mean": 0.3615,
-      "std": 0.2231
+      "mean": 0.3605,
+      "std": 0.2238,
+      "physical_unit": "g",
+      "physical_min": 0.2,
+      "physical_max": 297.6,
+      "physical_mean": 72.1
     },
     "Viscera_weight": {
-      "unit": "g",
       "desc": "Khối lượng nội tạng sau khi mổ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+      "unit": "UCI scale (đã chia 200)",
       "min": 0.0005,
-      "max": 0.76,
-      "mean": 0.1814,
-      "std": 0.1098
+      "max": 0.59,
+      "mean": 0.1809,
+      "std": 0.1099,
+      "physical_unit": "g",
+      "physical_min": 0.1,
+      "physical_max": 118.0,
+      "physical_mean": 36.18
     },
     "Shell_weight": {
-      "unit": "g",
       "desc": "Khối lượng vỏ sấy khô (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+      "unit": "UCI scale (đã chia 200)",
       "min": 0.0015,
       "max": 1.005,
-      "mean": 0.2392,
-      "std": 0.1385
+      "mean": 0.2391,
+      "std": 0.1393,
+      "physical_unit": "g",
+      "physical_min": 0.3,
+      "physical_max": 201.0,
+      "physical_mean": 47.82
     }
   }
 }

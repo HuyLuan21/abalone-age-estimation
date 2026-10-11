@@ -37,6 +37,11 @@ def test_model_card_endpoint():
     assert "performance_metrics" in data
     assert "hyperparameters" in data
     assert "age_group_mae" in data
+    assert "validation_performance" in data
+    assert "data_split" in data
+    assert data["data_split"]["train_samples"] == 2921
+    assert data["data_split"]["validation_samples"] == 626
+    assert data["data_split"]["test_samples"] == 626
     assert len(data["pipeline_steps"]) > 0
     # Verify exact synchronization with reports/age_group_mae.csv
     assert "Young (<=8 rings)" in data["age_group_mae"]
@@ -54,8 +59,8 @@ def test_feature_ranges_endpoint():
     assert "numeric_ranges" in data
     assert "Length" in data["numeric_ranges"]
     assert "valid_sex_values" in data
-    # 4,173 cleaned samples (4 anomalies filtered) -> 80% train = 3,338 samples
-    assert data["total_training_samples"] == 3338
+    # 4,173 cleaned samples (4 anomalies filtered) -> 70% train = 2,921 samples
+    assert data["total_training_samples"] == 2921
     assert "physical_unit" in data["numeric_ranges"]["Length"]
     assert data["numeric_ranges"]["Length"]["physical_unit"] == "mm"
 
@@ -156,6 +161,53 @@ def test_predict_invalid_negative_measurement():
     assert response.status_code == 422
 
 
+def test_predict_mixed_units_rejection():
+    """Test validation rejection when request mixes physical mm with UCI normalized weights."""
+    sample = {
+        "Sex": "M",
+        "Length": 91.0,  # Physical mm
+        "Diameter": 73.0,  # Physical mm
+        "Height": 19.0,  # Physical mm
+        "Whole_weight": 0.514,  # UCI scale (< 4.0 g, mixed units!)
+        "Shucked_weight": 0.224,
+        "Viscera_weight": 0.101,
+        "Shell_weight": 0.150,
+    }
+    response = client.post("/api/predict", json=sample)
+    assert response.status_code == 422
+
+
+def test_predict_explicit_unit_system():
+    """Test explicit unit_system declaration for physical and uci."""
+    physical_sample = {
+        "Sex": "F",
+        "Length": 105.0,
+        "Diameter": 82.0,
+        "Height": 25.0,
+        "Whole_weight": 140.0,
+        "Shucked_weight": 60.0,
+        "Viscera_weight": 30.0,
+        "Shell_weight": 42.0,
+        "unit_system": "physical",
+    }
+    resp1 = client.post("/api/predict", json=physical_sample)
+    assert resp1.status_code == 200
+
+    uci_sample = {
+        "Sex": "F",
+        "Length": 0.525,
+        "Diameter": 0.410,
+        "Height": 0.125,
+        "Whole_weight": 0.700,
+        "Shucked_weight": 0.300,
+        "Viscera_weight": 0.150,
+        "Shell_weight": 0.210,
+        "unit_system": "uci",
+    }
+    resp2 = client.post("/api/predict", json=uci_sample)
+    assert resp2.status_code == 200
+
+
 if __name__ == "__main__":
     print("Running automated API tests...")
     test_health_endpoint()
@@ -174,4 +226,8 @@ if __name__ == "__main__":
     print("[PASS] test_predict_invalid_diameter_greater_than_length")
     test_predict_invalid_negative_measurement()
     print("[PASS] test_predict_invalid_negative_measurement")
-    print("\n[SUCCESS] ALL 8 API UNIT TESTS PASSED SUCCESSFULLY!")
+    test_predict_mixed_units_rejection()
+    print("[PASS] test_predict_mixed_units_rejection")
+    test_predict_explicit_unit_system()
+    print("[PASS] test_predict_explicit_unit_system")
+    print("\n[SUCCESS] ALL 10 API UNIT TESTS PASSED SUCCESSFULLY!")

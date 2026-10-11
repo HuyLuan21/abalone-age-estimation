@@ -180,6 +180,7 @@ def split_data(
 
 def split_train_val_test(
     df: pd.DataFrame,
+    train_size: float = 0.70,
     val_size: float = 0.15,
     test_size: float = 0.15,
     random_state: int = 42,
@@ -187,18 +188,28 @@ def split_train_val_test(
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
     """Split dataset into 3 static partitions: Train, Validation, and Test.
 
-    Useful when hold-out validation is preferred over K-Fold Cross-Validation.
+    Strictly partitions dataset prior to any feature transformation or model learning
+    to prevent data leakage across validation and test partitions.
 
     Args:
         df: Full DataFrame containing features and target.
-        val_size: Ratio of validation set (default 0.15 for 15%).
-        test_size: Ratio of test set (default 0.15 for 15%).
+        train_size: Ratio of training partition (default 0.70 for 70%).
+        val_size: Ratio of validation partition (default 0.15 for 15%).
+        test_size: Ratio of test partition (default 0.15 for 15%).
         random_state: Random seed for reproducibility.
         auto_clean: Whether to ensure anomalies are filtered before split.
 
     Returns:
         Tuple of (X_train, X_val, X_test, y_train, y_val, y_test).
     """
+    total_ratio = train_size + val_size + test_size
+    if abs(total_ratio - 1.0) > 1e-5:
+        raise ValueError(
+            f"Tỷ lệ phân chia không hợp lệ: train ({train_size}) + val ({val_size}) + test ({test_size}) = {total_ratio:.4f} != 1.0"
+        )
+    if train_size <= 0 or val_size <= 0 or test_size <= 0:
+        raise ValueError("Tất cả các tỷ lệ train, val, test phải là số thực dương lớn hơn 0.")
+
     if auto_clean:
         has_anomalies = (df["Height"] <= 0).any() or (df["Height"] >= 1.0).any() or (df["Diameter"] > df["Length"]).any()
         if has_anomalies:
@@ -207,7 +218,7 @@ def split_train_val_test(
     X = df.drop(columns=[TARGET_NAME])
     y = df[TARGET_NAME]
 
-    # First split off the Test set
+    # Step 1: Isolate held-out test partition
     X_temp, X_test, y_temp, y_test = train_test_split(
         X,
         y,
@@ -215,14 +226,20 @@ def split_train_val_test(
         random_state=random_state,
     )
 
-    # Next split the remainder into Train and Validation
-    val_relative_size = val_size / (1.0 - test_size)
+    # Step 2: Separate remaining data into training and validation partitions
+    val_relative_size = val_size / (train_size + val_size)
     X_train, X_val, y_train, y_val = train_test_split(
         X_temp,
         y_temp,
         test_size=val_relative_size,
         random_state=random_state,
     )
+
+    # Verification: assert index disjointness and sample integrity
+    assert len(set(X_train.index) & set(X_val.index)) == 0, "Trùng lặp mẫu giữa Train và Validation!"
+    assert len(set(X_train.index) & set(X_test.index)) == 0, "Trùng lặp mẫu giữa Train và Test!"
+    assert len(set(X_val.index) & set(X_test.index)) == 0, "Trùng lặp mẫu giữa Validation và Test!"
+    assert len(X_train) + len(X_val) + len(X_test) == len(df), "Số lượng mẫu sau khi chia không khớp tổng mẫu gốc!"
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -236,5 +253,5 @@ if __name__ == "__main__":
     print(f"Cleaned dataset: {len(clean_df)} rows, Filtered anomalies: {len(anomalies_df)} rows")
     X_tr, X_te, y_tr, y_te = split_data(clean_df)
     print(f"Standard Split (Train/Test + CV): Train={X_tr.shape}, Test={X_te.shape}")
-    X_tr3, X_v3, X_te3, _, _, _ = split_train_val_test(clean_df)
+    X_tr3, X_v3, X_te3, _, _, _ = split_train_val_test(clean_df, train_size=0.70, val_size=0.15, test_size=0.15)
     print(f"Static 3-Way Split (Train/Val/Test): Train={X_tr3.shape}, Val={X_v3.shape}, Test={X_te3.shape}")

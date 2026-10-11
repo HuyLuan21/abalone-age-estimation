@@ -11,25 +11,29 @@ Dự án được tái cấu trúc dạng **Modular** theo đúng khuyến ngh�
 ```text
 abalone-age-estimation/
 ├── data/
-│   ├── README.md               # Mô tả nguồn gốc dữ liệu & DOI
-│   ├── data_dictionary.md      # Giải thích chi tiết các thuộc tính
+│   ├── README.md               # Mô tả nguồn gốc dữ liệu, bản quyền CC BY 4.0 & SHA-256
+│   ├── data_dictionary.md      # Giải thích chi tiết các thuộc tính & thang đo
 │   └── raw/
-│       ├── abalone.data        # Dữ liệu gốc UCI
+│       ├── abalone.data        # Dữ liệu gốc UCI (4,177 mẫu)
 │       └── abalone.names       # Tài liệu gốc mô tả thuộc tính
 ├── src/                        # Mã nguồn module hóa
 │   ├── __init__.py
-│   ├── data.py                 # Tải, kiểm tra chất lượng & chia Train/Test
+│   ├── data.py                 # Tải, làm sạch 4 mẫu ngoại lệ & chia Train/Val/Test
 │   ├── features.py             # Xây dựng tiền xử lý & scikit-learn Pipeline
-│   ├── train.py                # K-Fold CV, chọn tham số & lưu Model
+│   ├── train.py                # K-Fold CV trên Train, chọn tham số & lưu Model
 │   └── evaluate.py             # Đánh giá metric, phân tích sai số & vẽ biểu đồ
+├── tests/
+│   └── test_pipeline.py        # Kiểm thử toàn vẹn data split, leakage & reproducibility
 ├── models/
-│   ├── abalone_knn_pipeline.pkl# Pipeline k-NN đã huấn luyện hoàn chỉnh
-│   └── model_metadata.json     # Siêu dữ liệu động đồng bộ với API & Model Card
+│   ├── abalone_knn_pipeline.pkl# Pipeline k-NN đã huấn luyện hoàn chỉnh (No Scale, K=17)
+│   └── model_metadata.json     # Siêu dữ liệu động đồng bộ với API, Model Card & hệ đo
 ├── reports/
-│   ├── cv_results.csv          # Bảng kết quả 5-Fold Cross Validation
-│   ├── cv_ablation.csv         # Bảng so sánh Cross-Validation Scaled vs No-Scale trên Train
-│   ├── model_results.csv       # Bảng so sánh hiệu năng các mô hình trên Test
-│   ├── age_group_mae.csv       # Phân tích sai số theo nhóm tuổi
+│   ├── removed_anomalies.csv   # Kiểm kê 04 dòng bất thường bị loại trước khi chia tập
+│   ├── validation_results.csv  # Bảng đánh giá so sánh trên tập Validation (15%)
+│   ├── cv_results.csv          # Bảng kết quả 5-Fold Cross Validation trên Train (70%)
+│   ├── cv_ablation.csv         # Bảng so sánh CV Scaled vs No-Scale trên Train
+│   ├── model_results.csv       # Bảng tổng hợp hiệu năng Validation & Test
+│   ├── age_group_mae.csv       # Phân tích sai số theo nhóm tuổi trên Test
 │   └── figures/                # Biểu đồ phân tích EDA và đánh giá mô hình
 │       ├── rings_distribution.png
 │       ├── sex_distribution.png
@@ -38,7 +42,7 @@ abalone-age-estimation/
 │       ├── actual_vs_predicted.png
 │       └── residual_plot.png
 ├── app/                        # Ứng dụng Web & REST API
-├── main.py                     # Script điều phối toàn bộ quy trình
+├── main.py                     # Script điều phối toàn bộ quy trình Train/Val/Test
 ├── requirements.txt            # Danh sách thư viện phụ thuộc
 └── README.md                   # Tài liệu hướng dẫn sử dụng
 ```
@@ -126,17 +130,29 @@ python -m src.data
 | `GET` | `/api/feature-ranges` | Lấy miền giá trị và thống kê các biến đầu vào |
 | `POST` | `/api/predict` | Dự đoán số vòng, tuổi, khoảng tham chiếu láng giềng & cảnh báo OOD |
 
-### 3. Chạy Unit Test kiểm thử API tự động:
+### 3. Chạy Unit Test kiểm thử hệ thống tự động:
 
 ```powershell
+# 1. Kiểm thử toàn vẹn Pipeline, phân chia dữ liệu, không rò rỉ và tái lập
+python tests/test_pipeline.py
+
+# 2. Kiểm thử toàn diện REST API (10 ca kiểm thử: Endpoint, Schema, Mixed-unit rejection)
 python -m app.test_api
 ```
 
 ---
 
-## 🔬 Các thí nghiệm bắt buộc & Kết quả
+## 🔬 Các thí nghiệm bắt buộc & Kết quả thực tế (Quy trình Train 70% / Val 15% / Test 15%)
 
-1. **Thí nghiệm 1 (Baseline vs. k-NN):** Mô hình k-NN vượt trội hoàn toàn so với Median Baseline ($R^2 \approx 0.529$, $MAE \approx 1.551$ so với $R^2 \approx -0.073$, $MAE \approx 2.378$).
-2. **Thí nghiệm 2 (Có scale vs. Không scale):** So sánh bằng 5-Fold Cross-Validation trên Train (`reports/cv_ablation.csv`) để chọn mô hình khách quan không rò rỉ tập Test, sau đó kiểm định trên Test set.
-3. **Thí nghiệm 3 (Đồ thị MAE theo K):** Tìm $K$ tối ưu qua 5-Fold CV trên tập huấn luyện cho cả 2 phương án tiền xử lý (`reports/figures/mae_vs_k.png`).
-4. **Thí nghiệm 4 (Sai số theo nhóm tuổi):** Phân tích sự khác biệt MAE giữa các nhóm `Young` ($\le 8$), `Middle` ($9-12$), và `Old` ($> 12$), chỉ rõ nhóm già có sai số cao ($MAE \approx 3.845$) do đặc thù sinh học và độ lệch phân bố.
+1. **Thí nghiệm 1 (Baseline vs. k-NN):** Mô hình k-NN tối ưu vượt trội rõ rệt so với Median Baseline:
+   - **Tập Validation (626 mẫu):** Baseline MAE = $2.3674$ $\rightarrow$ KNN tối ưu MAE = **$1.4564$** (giảm 38.5% sai số).
+   - **Tập Test độc lập (626 mẫu):** Baseline MAE = $2.5655$, $R^2 = -0.0992$ $\rightarrow$ KNN tối ưu MAE = **$1.5063$**, $R^2 = \mathbf{0.5741}$.
+2. **Thí nghiệm 2 (Ablation Study: No Scale vs. StandardScaler):**
+   - So sánh bằng 5-Fold Cross-Validation trên tập Train (2,921 mẫu): `KNN - No Scale` đạt CV MAE = **$1.5213 \pm 0.0570$** (tốt hơn `KNN - StandardScaler` có CV MAE = $1.5360 \pm 0.0395$).
+   - Kiểm định trên tập Validation: `KNN - No Scale` đạt MAE = **$1.4564$** (so với StandardScaler MAE = $1.5190$).
+   - Đánh giá trên tập Test: `KNN - No Scale` đạt MAE = **$1.5063$** (so với StandardScaler MAE = $1.5490$).
+3. **Thí nghiệm 3 (Đồ thị MAE theo K):** Tìm $K$ tối ưu qua 5-Fold CV trên Train ($K=17$, `weights='distance'` cho No Scale; $K=25$ cho StandardScaler), lưu tại [`reports/figures/mae_vs_k.png`](reports/figures/mae_vs_k.png).
+4. **Thí nghiệm 4 (Phân tích sai số theo nhóm tuổi trên tập Test):**
+   - Nhóm non (`Young`, $\le 8$ vòng): $\text{MAE} = \mathbf{1.034}$ vòng.
+   - Nhóm trưởng thành (`Middle`, $9-12$ vòng): $\text{MAE} = \mathbf{0.932}$ vòng.
+   - Nhóm già (`Old`, $> 12$ vòng): $\text{MAE} = \mathbf{3.732}$ vòng (do sinh trưởng chậm dần và mật độ mẫu già ít).

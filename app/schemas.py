@@ -4,7 +4,7 @@ Includes request/response models, input validation, physical consistency checks,
 and metadata schemas aligned with UCI 1/200 scaling.
 """
 
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Any
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field, model_validator
 
@@ -65,27 +65,52 @@ class AbaloneInput(BaseModel):
         description="Khối lượng vỏ sau khi sấy khô theo thang UCI (đã chia 200, ví dụ 0.150) hoặc gam thực tế (ví dụ 30.0 g)",
         examples=[0.150],
     )
+    unit_system: Optional[Literal["uci", "physical"]] = Field(
+        default=None,
+        description="Chỉ định hệ đơn vị: 'uci' (thang UCI đã chia 200) hoặc 'physical' (mm và g thực tế). Mặc định là None (tự động phát hiện nhất quán).",
+    )
 
     @model_validator(mode="after")
     def normalize_units_and_validate(self) -> "AbaloneInput":
-        """Auto-convert physical mm/g units to UCI scale if needed, and validate physical integrity."""
-        # 1. Smart unit conversion: if physical measurements (e.g. Length > 2.0 mm or Weight > 5.0 g)
-        if self.Length > 2.0:
+        """Validate input integrity, prevent mixed-unit requests, and normalize to UCI scale."""
+        # 1. Inspect unit system consistency
+        sizes = [self.Length, self.Diameter, self.Height]
+        weights = [self.Whole_weight, self.Shucked_weight, self.Viscera_weight, self.Shell_weight]
+
+        has_physical_size = any(s > 2.0 for s in [self.Length, self.Diameter]) or self.Height > 1.5
+        has_physical_weight = any(w > 5.0 for w in weights)
+
+        has_uci_size = all(s <= 1.5 for s in sizes)
+        has_uci_weight = all(w <= 4.0 for w in weights)
+
+        if self.unit_system == "physical":
+            is_physical = True
+        elif self.unit_system == "uci":
+            is_physical = False
+            if has_physical_size or has_physical_weight:
+                raise ValueError(
+                    "Trường unit_system được đặt là 'uci' nhưng phát hiện giá trị đo lường vượt ngưỡng thang UCI (Length/Diameter > 2.0 hoặc Weight > 5.0)."
+                )
+        else:
+            # Auto-detection mode: prevent mixed units in the same request
+            if (has_physical_size and has_uci_weight) or (has_physical_weight and has_uci_size):
+                raise ValueError(
+                    "Phát hiện dữ liệu không nhất quán về hệ đơn vị giữa các trường (trộn lẫn giữa mm/g thực tế và thang UCI). "
+                    "Vui lòng cung cấp toàn bộ giá trị theo mm/g hoặc toàn bộ theo thang UCI."
+                )
+            is_physical = has_physical_size or has_physical_weight
+
+        # 2. Normalize to UCI scale if physical units are supplied
+        if is_physical:
             self.Length = round(self.Length / 200.0, 4)
-        if self.Diameter > 2.0:
             self.Diameter = round(self.Diameter / 200.0, 4)
-        if self.Height > 1.5:
             self.Height = round(self.Height / 200.0, 4)
-        if self.Whole_weight > 5.0:
             self.Whole_weight = round(self.Whole_weight / 200.0, 4)
-        if self.Shucked_weight > 5.0:
             self.Shucked_weight = round(self.Shucked_weight / 200.0, 4)
-        if self.Viscera_weight > 5.0:
             self.Viscera_weight = round(self.Viscera_weight / 200.0, 4)
-        if self.Shell_weight > 5.0:
             self.Shell_weight = round(self.Shell_weight / 200.0, 4)
 
-        # 2. Strict domain bounds check (in UCI normalized scale)
+        # 3. Strict domain bounds check (in UCI normalized scale)
         if self.Height <= 0.0 or self.Height >= 0.6:
             raise ValueError(
                 f"Chiều cao (Height={self.Height}) bất thường hoặc phi sinh học. Phải nằm trong khoảng (0.0, 0.6) theo thang UCI."
@@ -96,13 +121,13 @@ class AbaloneInput(BaseModel):
                 f"Kích thước chiều dài hoặc đường kính ({self.Length}, {self.Diameter}) vượt quá giới hạn sinh học hợp lý."
             )
 
-        # 3. Geometric consistency: Diameter must not exceed Length
+        # 4. Geometric consistency: Diameter must not exceed Length
         if self.Diameter > self.Length:
             raise ValueError(
                 f"Đường kính (Diameter={self.Diameter}) không thể lớn hơn Chiều dài (Length={self.Length})."
             )
 
-        # 4. Weight component consistency: components cannot exceed whole weight
+        # 5. Weight component consistency: components cannot exceed whole weight
         for part_name, part_val in [
             ("Khối lượng thịt (Shucked_weight)", self.Shucked_weight),
             ("Khối lượng nội tạng (Viscera_weight)", self.Viscera_weight),
@@ -210,6 +235,9 @@ class ModelCardResponse(BaseModel):
     pipeline_steps: List[str]
     hyperparameters: Dict[str, object]
     performance_metrics: Dict[str, float]
+    validation_performance: Optional[Dict[str, float]] = None
+    cv_performance: Optional[Dict[str, float]] = None
+    data_split: Optional[Dict[str, Any]] = None
     age_group_mae: Dict[str, float]
     dataset_source: str = "UCI Machine Learning Repository (DOI: 10.24432/C55C7W)"
     intended_use: str = "Hỗ trợ nghiên cứu nuôi trồng và sàng lọc mẫu bào ngư cần kiểm tra vi thể."

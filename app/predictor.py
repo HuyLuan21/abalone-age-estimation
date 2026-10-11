@@ -447,6 +447,9 @@ class AbalonePredictor:
             pipeline_steps=pipeline_steps,
             hyperparameters=hyperparams,
             performance_metrics=perf_metrics,
+            validation_performance=self.metadata.get("validation_performance"),
+            cv_performance=self.metadata.get("cv_performance"),
+            data_split=self.metadata.get("data_split"),
             age_group_mae=age_mae,
             limitations=limitations,
         )
