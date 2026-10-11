@@ -1,0 +1,1107 @@
+{
+  "sources": {
+    "modelResults": "reports/model_results.csv",
+    "cvAblation": "reports/cv_ablation.csv",
+    "cvResults": "reports/cv_results.csv",
+    "ageGroupMae": "reports/age_group_mae.csv",
+    "metadata": "models/model_metadata.json",
+    "residualPlot": "reports/figures/residual_plot.png",
+    "removedAnomalies": "reports/removed_anomalies.csv",
+    "rawDataset": "data/raw/abalone.data"
+  },
+  "dataAudit": {
+    "rawSamples": 4177,
+    "removedSamples": 4,
+    "cleanedSamples": 4173,
+    "trainingSamples": 3338,
+    "testSamples": 835
+  },
+  "modelResults": [
+    {
+      "model": "Median Baseline",
+      "mae": 2.5401197604790418,
+      "rmse": 3.609534944417364,
+      "r2": -0.08796306276914723
+    },
+    {
+      "model": "KNN - No Scale",
+      "mae": 1.522332802835312,
+      "rmse": 2.274184388148217,
+      "r2": 0.5681200947688336
+    },
+    {
+      "model": "KNN - StandardScaler",
+      "mae": 1.5549232954607008,
+      "rmse": 2.3334582815674443,
+      "r2": 0.5453138439623693
+    }
+  ],
+  "cvAblation": [
+    {
+      "preprocessing": "No Scale",
+      "bestK": 19,
+      "bestWeights": "distance",
+      "cvMae": 1.502214944796422,
+      "cvStd": 0.04270812649624158
+    },
+    {
+      "preprocessing": "StandardScaler",
+      "bestK": 25,
+      "bestWeights": "distance",
+      "cvMae": 1.5274596541097185,
+      "cvStd": 0.0442738038355985
+    }
+  ],
+  "cvResults": [
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 1,
+      "mae": 2.0209396798606685,
+      "maeStd": 0.05244011902371239
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 2,
+      "mae": 1.7818552550072269,
+      "maeStd": 0.07414885095561488
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 3,
+      "mae": 1.6664331008148618,
+      "maeStd": 0.05116357344189627
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 4,
+      "mae": 1.6307436102308128,
+      "maeStd": 0.03891138745261656
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 5,
+      "mae": 1.601298961297794,
+      "maeStd": 0.034225623901399965
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 6,
+      "mae": 1.580911490362603,
+      "maeStd": 0.03901434750662843
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 7,
+      "mae": 1.5676048417194313,
+      "maeStd": 0.028697658173838403
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 8,
+      "mae": 1.5685106361489916,
+      "maeStd": 0.03569380193340046
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 9,
+      "mae": 1.5610591909634004,
+      "maeStd": 0.037100497830859995
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 10,
+      "mae": 1.554230893535268,
+      "maeStd": 0.039687392993885726
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 11,
+      "mae": 1.5554545944229843,
+      "maeStd": 0.037070523912222354
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 12,
+      "mae": 1.549581571489704,
+      "maeStd": 0.040609607022439924
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 13,
+      "mae": 1.5428387832799397,
+      "maeStd": 0.0413283725661962
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 14,
+      "mae": 1.5407837783417953,
+      "maeStd": 0.03860753415754006
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 15,
+      "mae": 1.5404611765973302,
+      "maeStd": 0.03690251970389166
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 16,
+      "mae": 1.5385864234798767,
+      "maeStd": 0.03440805749883204
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 17,
+      "mae": 1.5406131559088367,
+      "maeStd": 0.03911986405101172
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 18,
+      "mae": 1.5377222067608909,
+      "maeStd": 0.04103404268544121
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 19,
+      "mae": 1.5370279877395054,
+      "maeStd": 0.04288012950046095
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 20,
+      "mae": 1.537420930253436,
+      "maeStd": 0.0451494407397102
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 21,
+      "mae": 1.5376359296827207,
+      "maeStd": 0.04448500035873063
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 22,
+      "mae": 1.5378559495429205,
+      "maeStd": 0.04706875466129145
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 23,
+      "mae": 1.5375763433045257,
+      "maeStd": 0.04829863832341585
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 24,
+      "mae": 1.5364333177722518,
+      "maeStd": 0.04836793931420855
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 25,
+      "mae": 1.5365218648160948,
+      "maeStd": 0.04571997690375022
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 26,
+      "mae": 1.5402795780829066,
+      "maeStd": 0.04496821001363438
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 27,
+      "mae": 1.5421814209329134,
+      "maeStd": 0.04546331547999444
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 28,
+      "mae": 1.5456800844658936,
+      "maeStd": 0.04673806510444911
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 29,
+      "mae": 1.5471719023824861,
+      "maeStd": 0.047197775631504006
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "uniform",
+      "k": 30,
+      "mae": 1.5498934365152754,
+      "maeStd": 0.046272061495713133
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 1,
+      "mae": 2.0209396798606685,
+      "maeStd": 0.05244011902371239
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 2,
+      "mae": 1.7875962117488817,
+      "maeStd": 0.06707830671066019
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 3,
+      "mae": 1.673159392103868,
+      "maeStd": 0.048774931795741994
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 4,
+      "mae": 1.63159901424278,
+      "maeStd": 0.039443786556410974
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 5,
+      "mae": 1.6020650685460975,
+      "maeStd": 0.03618188450702606
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 6,
+      "mae": 1.581653791977034,
+      "maeStd": 0.04020907747804281
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 7,
+      "mae": 1.5675101803310363,
+      "maeStd": 0.03051169044426462
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 8,
+      "mae": 1.5655059794950656,
+      "maeStd": 0.03585066519924436
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 9,
+      "mae": 1.557032544735208,
+      "maeStd": 0.036116247303412924
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 10,
+      "mae": 1.5504085323072805,
+      "maeStd": 0.03855618489253503
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 11,
+      "mae": 1.5495998736476837,
+      "maeStd": 0.03670965469661418
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 12,
+      "mae": 1.543480243721027,
+      "maeStd": 0.03957256474042156
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 13,
+      "mae": 1.5371506998734321,
+      "maeStd": 0.04011262759850582
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 14,
+      "mae": 1.5349604924992666,
+      "maeStd": 0.03842131616852841
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 15,
+      "mae": 1.5343459045248575,
+      "maeStd": 0.037301889461049266
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 16,
+      "mae": 1.5324024104004905,
+      "maeStd": 0.03548313401467119
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 17,
+      "mae": 1.5330742814703335,
+      "maeStd": 0.03923884392366147
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 18,
+      "mae": 1.5310030507213586,
+      "maeStd": 0.04045833867266838
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 19,
+      "mae": 1.5299899853261816,
+      "maeStd": 0.04236556680645093
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 20,
+      "mae": 1.5302388095991755,
+      "maeStd": 0.04426919404966639
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 21,
+      "mae": 1.529956131684977,
+      "maeStd": 0.04369878990703002
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 22,
+      "mae": 1.5298720575420242,
+      "maeStd": 0.04562810520034856
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 23,
+      "mae": 1.529292544723115,
+      "maeStd": 0.04647098632570163
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 24,
+      "mae": 1.52789701546263,
+      "maeStd": 0.04642701265608663
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 25,
+      "mae": 1.5274596541097185,
+      "maeStd": 0.0442738038355985
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 26,
+      "mae": 1.5301137614086584,
+      "maeStd": 0.04359464368324846
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 27,
+      "mae": 1.531627879628839,
+      "maeStd": 0.043986313151943846
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 28,
+      "mae": 1.5340699485361875,
+      "maeStd": 0.044831146127891165
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 29,
+      "mae": 1.534953101688843,
+      "maeStd": 0.04484668190087439
+    },
+    {
+      "scaling": "StandardScaler",
+      "withScaling": true,
+      "weights": "distance",
+      "k": 30,
+      "mae": 1.5367716829196376,
+      "maeStd": 0.04363921264421352
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 1,
+      "mae": 1.9316943324744813,
+      "maeStd": 0.04115044104750766
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 2,
+      "mae": 1.728560495201501,
+      "maeStd": 0.03410890121824869
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 3,
+      "mae": 1.63470659879641,
+      "maeStd": 0.020286832117083382
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 4,
+      "mae": 1.5942860156747973,
+      "maeStd": 0.03495348217341521
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 5,
+      "mae": 1.5635588792430133,
+      "maeStd": 0.03477466406028785
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 6,
+      "mae": 1.5492161105076208,
+      "maeStd": 0.03703381088890743
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 7,
+      "mae": 1.5389701214405629,
+      "maeStd": 0.043121801250528495
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 8,
+      "mae": 1.5380589084200416,
+      "maeStd": 0.04647223995033888
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 9,
+      "mae": 1.5374588653776904,
+      "maeStd": 0.043257827613055314
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 10,
+      "mae": 1.5246610975949149,
+      "maeStd": 0.04543263631419452
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 11,
+      "mae": 1.522910496303291,
+      "maeStd": 0.0448479869867369
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 12,
+      "mae": 1.5161285001211968,
+      "maeStd": 0.045221963225772134
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 13,
+      "mae": 1.51272049373747,
+      "maeStd": 0.04630686232237607
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 14,
+      "mae": 1.5129872082778113,
+      "maeStd": 0.04512639884120175
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 15,
+      "mae": 1.5123776435135725,
+      "maeStd": 0.046622388123139916
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 16,
+      "mae": 1.5115445084344057,
+      "maeStd": 0.0476365061084642
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 17,
+      "mae": 1.51247081637061,
+      "maeStd": 0.041357415065862824
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 18,
+      "mae": 1.5141226791793723,
+      "maeStd": 0.04231067668964982
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 19,
+      "mae": 1.5126857702570082,
+      "maeStd": 0.042217050446309835
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 20,
+      "mae": 1.5134124778927902,
+      "maeStd": 0.04267848905517925
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 21,
+      "mae": 1.517595971047838,
+      "maeStd": 0.03998447743816347
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 22,
+      "mae": 1.5195887426455525,
+      "maeStd": 0.04010636779980043
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 23,
+      "mae": 1.5249891586359907,
+      "maeStd": 0.041290930913281176
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 24,
+      "mae": 1.5245821886960713,
+      "maeStd": 0.04573029555364245
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 25,
+      "mae": 1.5247596979953137,
+      "maeStd": 0.04758470636103696
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 26,
+      "mae": 1.5282075567467301,
+      "maeStd": 0.04723503988730993
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 27,
+      "mae": 1.5309557795952322,
+      "maeStd": 0.048784070072840795
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 28,
+      "mae": 1.5345582181107906,
+      "maeStd": 0.04808399734121947
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 29,
+      "mae": 1.5360930210096273,
+      "maeStd": 0.05010319521448192
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "uniform",
+      "k": 30,
+      "mae": 1.5379643561452807,
+      "maeStd": 0.05045470583442551
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 1,
+      "mae": 1.9316943324744813,
+      "maeStd": 0.04115044104750766
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 2,
+      "mae": 1.735398242148055,
+      "maeStd": 0.03285774415184485
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 3,
+      "mae": 1.6399454977342547,
+      "maeStd": 0.019063377377400482
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 4,
+      "mae": 1.596234651263006,
+      "maeStd": 0.03218488864089418
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 5,
+      "mae": 1.5644427722644958,
+      "maeStd": 0.031969326615449344
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 6,
+      "mae": 1.5476172509170465,
+      "maeStd": 0.03496790829420825
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 7,
+      "mae": 1.5355062371545725,
+      "maeStd": 0.03874404335096773
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 8,
+      "mae": 1.532546550656831,
+      "maeStd": 0.042340991154893586
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 9,
+      "mae": 1.5297899513084539,
+      "maeStd": 0.040621968167570736
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 10,
+      "mae": 1.518695256498884,
+      "maeStd": 0.04365553447652525
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 11,
+      "mae": 1.517650119349112,
+      "maeStd": 0.04411267958200146
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 12,
+      "mae": 1.510289604403233,
+      "maeStd": 0.04452032239483903
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 13,
+      "mae": 1.5068470600101254,
+      "maeStd": 0.04492949410709987
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 14,
+      "mae": 1.5054857766790595,
+      "maeStd": 0.043902880139599816
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 15,
+      "mae": 1.5054378269511564,
+      "maeStd": 0.04545008830089231
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 16,
+      "mae": 1.5039302042269582,
+      "maeStd": 0.04647634290972931
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 17,
+      "mae": 1.5036397334583051,
+      "maeStd": 0.04183766542231752
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 18,
+      "mae": 1.5041427401802172,
+      "maeStd": 0.04256608003337702
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 19,
+      "mae": 1.502214944796422,
+      "maeStd": 0.04270812649624158
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 20,
+      "mae": 1.5026240323542446,
+      "maeStd": 0.043039806203544785
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 21,
+      "mae": 1.5053045304291486,
+      "maeStd": 0.04107248370908215
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 22,
+      "mae": 1.5067221768558183,
+      "maeStd": 0.0413094735592932
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 23,
+      "mae": 1.5107507698013933,
+      "maeStd": 0.04165404183743392
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 24,
+      "mae": 1.5104550290217555,
+      "maeStd": 0.04507536904255917
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 25,
+      "mae": 1.510432111422603,
+      "maeStd": 0.04706797472621288
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 26,
+      "mae": 1.512810084127069,
+      "maeStd": 0.04673253024231055
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 27,
+      "mae": 1.5144728428303313,
+      "maeStd": 0.048355505620787664
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 28,
+      "mae": 1.5170193521168076,
+      "maeStd": 0.04780718877133731
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 29,
+      "mae": 1.5180491312046887,
+      "maeStd": 0.04912722315332845
+    },
+    {
+      "scaling": "No Scale",
+      "withScaling": false,
+      "weights": "distance",
+      "k": 30,
+      "mae": 1.5191366351537545,
+      "maeStd": 0.049418349658703564
+    }
+  ],
+  "ageGroupMae": [
+    {
+      "group": "Young",
+      "mae": 1.0278389878366598
+    },
+    {
+      "group": "Middle",
+      "mae": 1.0041165982524662
+    },
+    {
+      "group": "Old",
+      "mae": 3.8915609795548214
+    }
+  ],
+  "metadata": {
+    "totalTrainingSamples": 3338,
+    "totalTestSamples": 835,
+    "hyperparameters": {
+      "n_neighbors": 25,
+      "weights": "distance",
+      "metric": "minkowski (p=2 Euclidean)",
+      "scaling": "StandardScaler",
+      "cv_folds": 5,
+      "random_state": 42
+    },
+    "pipelineSteps": [
+      "StandardScaler (7 numerical features)",
+      "OneHotEncoder (Sex categorical feature)",
+      "KNeighborsRegressor(n_neighbors=25, weights='distance')"
+    ],
+    "intendedUse": "Hỗ trợ nghiên cứu nuôi trồng và sàng lọc mẫu bào ngư cần kiểm tra vi thể.",
+    "limitations": [
+      "Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = 1.028) và trung bình (MAE = 1.004).",
+      "Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = 3.892) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
+      "Quy trình so sánh mô hình (Scaling vs No-Scale) được chọn dựa trên 5-Fold Cross-Validation trên Train để bảo đảm không rò rỉ tập Test.",
+      "Ước lượng hỗ trợ sàng lọc sơ bộ, không thay thế quy trình cắt vỏ và đếm vòng kính hiển vi tiêu chuẩn."
+    ],
+    "datasetSource": "UCI Machine Learning Repository (DOI: 10.24432/C55C7W)",
+    "featureStatistics": {
+      "Length": {
+        "description": "Chiều dài lớn nhất của vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
+        "min": 15,
+        "max": 163,
+        "mean": 105.06,
+        "physicalUnit": "mm"
+      },
+      "Diameter": {
+        "description": "Đường kính vuông góc với chiều dài (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
+        "min": 11,
+        "max": 130,
+        "mean": 81.76,
+        "physicalUnit": "mm"
+      },
+      "Height": {
+        "description": "Chiều cao kèm thịt trong vỏ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 mm)",
+        "min": 2,
+        "max": 103,
+        "mean": 27.900000000000002,
+        "physicalUnit": "mm"
+      },
+      "Whole_weight": {
+        "description": "Tổng khối lượng toàn bộ cá thể (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+        "min": 0.4,
+        "max": 565.1,
+        "mean": 166.34,
+        "physicalUnit": "g"
+      },
+      "Shucked_weight": {
+        "description": "Khối lượng phần thịt (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+        "min": 0.2,
+        "max": 297.6,
+        "mean": 72.3,
+        "physicalUnit": "g"
+      },
+      "Viscera_weight": {
+        "description": "Khối lượng nội tạng sau khi mổ (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+        "min": 0.1,
+        "max": 152,
+        "mean": 36.28,
+        "physicalUnit": "g"
+      },
+      "Shell_weight": {
+        "description": "Khối lượng vỏ sấy khô (Dữ liệu gốc UCI chuẩn hóa chia 200, 1 đơn vị = 200 gam)",
+        "min": 0.3,
+        "max": 200.99999999999997,
+        "mean": 47.839999999999996,
+        "physicalUnit": "g"
+      }
+    }
+  }
+}
