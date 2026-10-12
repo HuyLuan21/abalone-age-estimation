@@ -42,7 +42,17 @@ def test_model_card_endpoint():
     assert data["data_split"]["train_samples"] == 2921
     assert data["data_split"]["validation_samples"] == 626
     assert data["data_split"]["test_samples"] == 626
-    assert len(data["pipeline_steps"]) > 0
+    # Verify pipeline preprocessing and scaling strictly match No Scale
+    assert data["hyperparameters"]["scaling"] == "No Scale", (
+        f"Expected 'No Scale', but got: {data['hyperparameters']['scaling']}"
+    )
+    steps_combined = " ".join(data["pipeline_steps"])
+    assert "StandardScaler" not in steps_combined, (
+        f"Unexpected StandardScaler found in Model Card pipeline_steps: {data['pipeline_steps']}"
+    )
+    assert "OneHotEncoder" in steps_combined
+    assert "KNeighborsRegressor" in steps_combined
+
     # Verify exact synchronization with reports/age_group_mae.csv
     assert "Young (<=8 rings)" in data["age_group_mae"]
     assert "Middle (9-12 rings)" in data["age_group_mae"]
@@ -313,12 +323,118 @@ def test_predict_valid_small_juvenile_physical_sample():
     assert data["predicted_rings"] > 0
 
 
+def test_model_card_matches_loaded_pipeline_artifact():
+    """Verify that Model Card returned by API matches the serialized pipeline artifact identically."""
+    import joblib
+    model_path = os.path.join(PROJECT_ROOT, "models", "abalone_knn_pipeline.pkl")
+    pipeline = joblib.load(model_path)
+    knn = pipeline.named_steps["knn"]
+    preprocessor = pipeline.named_steps["preprocessor"]
+
+    # Check that fitted pipeline has passthrough for numeric (No Scale)
+    for name, trans, _ in preprocessor.transformers_:
+        if name == "numeric":
+            assert trans == "passthrough" or not hasattr(trans, "mean_"), (
+                f"Pipeline should not have fitted scaler, got {trans}"
+            )
+
+    response = client.get("/api/model-card")
+    assert response.status_code == 200
+    card = response.json()
+    assert card["hyperparameters"]["n_neighbors"] == knn.n_neighbors
+    assert card["hyperparameters"]["weights"] == knn.weights
+    assert card["hyperparameters"]["scaling"] == "No Scale"
+
+
+def test_predict_physical_boundary_samples():
+    """Verify edge-case biological physical samples are correctly accepted."""
+    # 1. Boundary juvenile: Length = 35.0 mm, Whole_weight = 3.20 g (<4g)
+    juvenile_boundary = {
+        "Sex": "I",
+        "Length": 35.0,
+        "Diameter": 27.0,
+        "Height": 8.0,
+        "Whole_weight": 3.20,
+        "Shucked_weight": 1.40,
+        "Viscera_weight": 0.70,
+        "Shell_weight": 1.00,
+        "unit_system": "physical",
+    }
+    r1 = client.post("/api/predict", json=juvenile_boundary)
+    assert r1.status_code == 200, f"Boundary juvenile rejected: {r1.text}"
+
+    # 2. Boundary adult: Length = 40.0 mm, Whole_weight = 7.70 g
+    adult_boundary = {
+        "Sex": "M",
+        "Length": 40.0,
+        "Diameter": 31.0,
+        "Height": 10.0,
+        "Whole_weight": 7.70,
+        "Shucked_weight": 3.50,
+        "Viscera_weight": 1.60,
+        "Shell_weight": 2.40,
+        "unit_system": "physical",
+    }
+    r2 = client.post("/api/predict", json=adult_boundary)
+    assert r2.status_code == 200, f"Boundary adult rejected: {r2.text}"
+
+    # 3. Maximum size adult: Length = 160.0 mm, Whole_weight = 520.0 g
+    large_adult = {
+        "Sex": "F",
+        "Length": 160.0,
+        "Diameter": 125.0,
+        "Height": 45.0,
+        "Whole_weight": 520.0,
+        "Shucked_weight": 250.0,
+        "Viscera_weight": 120.0,
+        "Shell_weight": 150.0,
+        "unit_system": "physical",
+    }
+    r3 = client.post("/api/predict", json=large_adult)
+    assert r3.status_code == 200, f"Large adult rejected: {r3.text}"
+
+
+def test_predict_physical_boundary_rejections():
+    """Verify that boundary mixed-unit or sub-biological inputs are strictly rejected."""
+    # Boundary mixed: Length = 40.0 mm (adult length), but Whole_weight = 0.514 g (UCI scale)
+    mixed_boundary = {
+        "Sex": "M",
+        "Length": 40.0,
+        "Diameter": 31.0,
+        "Height": 10.0,
+        "Whole_weight": 0.514,
+        "Shucked_weight": 0.224,
+        "Viscera_weight": 0.101,
+        "Shell_weight": 0.150,
+        "unit_system": "physical",
+    }
+    r1 = client.post("/api/predict", json=mixed_boundary)
+    assert r1.status_code == 422, "Adult length with UCI weight should be rejected"
+
+    # Sub-biological: Whole_weight < 0.1 g
+    sub_bio = {
+        "Sex": "I",
+        "Length": 15.0,
+        "Diameter": 11.0,
+        "Height": 2.0,
+        "Whole_weight": 0.05,
+        "Shucked_weight": 0.02,
+        "Viscera_weight": 0.01,
+        "Shell_weight": 0.01,
+        "unit_system": "physical",
+    }
+    r2 = client.post("/api/predict", json=sub_bio)
+    assert r2.status_code == 422, "Weight < 0.1g should be rejected"
+
+
 if __name__ == "__main__":
     print("Running automated API tests...")
     test_health_endpoint()
     print("[PASS] test_health_endpoint")
     test_model_card_endpoint()
     print("[PASS] test_model_card_endpoint")
+    test_model_card_matches_loaded_pipeline_artifact()
+    print("[PASS] test_model_card_matches_loaded_pipeline_artifact")
     test_feature_ranges_endpoint()
     print("[PASS] test_feature_ranges_endpoint")
     test_predict_valid_sample()
@@ -327,6 +443,10 @@ if __name__ == "__main__":
     print("[PASS] test_predict_physical_units_sample")
     test_predict_valid_small_juvenile_physical_sample()
     print("[PASS] test_predict_valid_small_juvenile_physical_sample")
+    test_predict_physical_boundary_samples()
+    print("[PASS] test_predict_physical_boundary_samples")
+    test_predict_physical_boundary_rejections()
+    print("[PASS] test_predict_physical_boundary_rejections")
     test_predict_out_of_distribution_warning()
     print("[PASS] test_predict_out_of_distribution_warning")
     test_predict_invalid_diameter_greater_than_length()
@@ -347,4 +467,4 @@ if __name__ == "__main__":
     print("[PASS] test_predict_boundary_cases_auto_unit_detection")
     test_spa_frontend_serving()
     print("[PASS] test_spa_frontend_serving")
-    print("\n[SUCCESS] ALL 16 API & FULLSTACK UNIT TESTS PASSED SUCCESSFULLY!")
+    print("\n[SUCCESS] ALL 19 API & FULLSTACK UNIT TESTS PASSED SUCCESSFULLY!")

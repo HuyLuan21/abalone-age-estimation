@@ -135,6 +135,14 @@ def test_model_artifact_load_and_predict():
             }
         ]
     )
+    preprocessor = loaded_pipe.named_steps["preprocessor"]
+    for name, trans, _ in preprocessor.transformers_:
+        if name == "numeric":
+            is_scaler = hasattr(trans, "__class__") and "StandardScaler" in trans.__class__.__name__
+            assert not is_scaler, (
+                f"Loaded model pipeline should NOT use StandardScaler (No Scale), got {trans}"
+            )
+
     pred = loaded_pipe.predict(sample_df)
     assert len(pred) == 1
     assert 1.0 <= pred[0] <= 30.0
@@ -151,6 +159,8 @@ def test_metadata_consistency():
     assert meta["data_split"]["train_samples"] == 2921
     assert meta["data_split"]["validation_samples"] == 626
     assert meta["data_split"]["test_samples"] == 626
+    assert meta["hyperparameters"]["scaling"] == "No Scale"
+    assert "StandardScaler" not in " ".join(meta["pipeline_steps"])
     assert "cv_performance" in meta
     assert "validation_performance" in meta
     assert "performance_metrics" in meta

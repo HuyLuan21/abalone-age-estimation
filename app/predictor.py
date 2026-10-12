@@ -216,11 +216,11 @@ class AbalonePredictor:
                 perf = {}
                 for _, row in df_res.iterrows():
                     m_name = str(row["Model"])
-                    if "StandardScaler" in m_name:
+                    if ("No Scale" in m_name or "Refitted" in m_name) and not pd.isna(row["MAE"]):
                         perf["Test_MAE"] = round(float(row["MAE"]), 4)
                         perf["Test_RMSE"] = round(float(row["RMSE"]), 4)
                         perf["Test_R2"] = round(float(row["R2"]), 4)
-                    elif "Baseline" in m_name:
+                    elif "Baseline" in m_name and not pd.isna(row["MAE"]):
                         perf["Baseline_Median_MAE"] = round(float(row["MAE"]), 4)
                 self.metadata["performance_metrics"] = perf
             except Exception:
@@ -423,25 +423,44 @@ class AbalonePredictor:
             ],
         )
 
-        pipeline_steps = self.metadata.get(
-            "pipeline_steps",
-            [
-                "StandardScaler (7 numerical features)",
-                "OneHotEncoder (Sex categorical feature)",
-                f"KNeighborsRegressor(n_neighbors={knn.n_neighbors}, weights='{knn.weights}')",
-            ],
-        )
+        # Dynamically inspect preprocessing from the actual loaded scikit-learn pipeline
+        has_scaler = False
+        if "preprocessor" in self.pipeline.named_steps:
+            preprocessor = self.pipeline.named_steps["preprocessor"]
+            for name, trans, _ in getattr(preprocessor, "transformers_", []):
+                if name == "numeric":
+                    if hasattr(trans, "__class__") and "StandardScaler" in trans.__class__.__name__:
+                        has_scaler = True
+                    elif isinstance(trans, str) and trans == "passthrough":
+                        has_scaler = False
 
-        hyperparams = self.metadata.get(
-            "hyperparameters",
-            {
-                "n_neighbors": knn.n_neighbors,
-                "weights": knn.weights,
-                "metric": "minkowski (p=2 Euclidean)",
-                "scaling": "StandardScaler",
-                "cv_folds": 5,
-            },
+        scaling_type = "StandardScaler" if has_scaler else "No Scale"
+
+        # Determine pipeline steps dynamically or from verified metadata
+        if "pipeline_steps" in self.metadata and isinstance(self.metadata["pipeline_steps"], list):
+            pipeline_steps = list(self.metadata["pipeline_steps"])
+        else:
+            pipeline_steps = []
+            if has_scaler:
+                pipeline_steps.append("StandardScaler (7 numerical features)")
+            pipeline_steps.append("OneHotEncoder (Sex categorical feature)")
+            pipeline_steps.append(f"KNeighborsRegressor(n_neighbors={knn.n_neighbors}, weights='{knn.weights}')")
+
+        hyperparams = dict(
+            self.metadata.get(
+                "hyperparameters",
+                {
+                    "n_neighbors": knn.n_neighbors,
+                    "weights": knn.weights,
+                    "metric": "minkowski (p=2 Euclidean)",
+                    "scaling": scaling_type,
+                    "cv_folds": 5,
+                },
+            )
         )
+        hyperparams["scaling"] = scaling_type
+        hyperparams["n_neighbors"] = knn.n_neighbors
+        hyperparams["weights"] = knn.weights
 
         return ModelCardResponse(
             pipeline_steps=pipeline_steps,
