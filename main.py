@@ -285,10 +285,12 @@ def run_pipeline(
     final_test_pred = refitted_pipeline.predict(X_test)
     final_test_metrics = calculate_metrics(y_test, final_test_pred)
 
-    baseline_test_pred = np.full(shape=len(y_test), fill_value=baseline_val)
+    # Baseline refitted on combined 85% Train+Val partition (ensuring identical training volume as refitted KNN)
+    baseline_refit_val = train_baseline_median(y_train_val)
+    baseline_test_pred = np.full(shape=len(y_test), fill_value=baseline_refit_val)
     baseline_test_metrics = calculate_metrics(y_test, baseline_test_pred)
 
-    print(f"  [OK] Baseline Held-out Test MAE: {baseline_test_metrics['MAE']:.4f}")
+    print(f"  [OK] Baseline Held-out Test MAE: {baseline_test_metrics['MAE']:.4f} (Median = {baseline_refit_val:.2f} rings from Train+Val 85%)")
     print(f"  [OK] Final Model Test MAE      : {final_test_metrics['MAE']:.4f} (RMSE: {final_test_metrics['RMSE']:.4f}, R2: {final_test_metrics['R2']:.4f})")
 
     test_records = [
