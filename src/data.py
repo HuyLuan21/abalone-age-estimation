@@ -89,18 +89,27 @@ def clean_anomalies(
         reasons.append(KNOWN_ANOMALIES_METADATA.get(idx, "Physical inconsistency or biological impossibility."))
     df_anomalies["Anomaly_Reason"] = reasons
 
-    # Safety check on standard UCI dataset (4,177 rows): Ensure exactly the 4 expected physical anomalies are isolated
+    # Strict safety audit check on standard UCI dataset (4,177 rows):
+    # Ensure exactly and only the 4 audited physical anomalies are detected and filtered.
     if len(df) == 4177:
         detected_indices = set(df_anomalies.index)
         expected_indices = set(KNOWN_ANOMALIES_METADATA.keys())
         if detected_indices != expected_indices:
             unexpected = detected_indices - expected_indices
+            missing = expected_indices - detected_indices
+            error_lines = [
+                "LỖI TOÀN VẸN DỮ LIỆU: Danh sách dị biệt phát hiện sai lệch so với 4 mẫu đã kiểm toán!",
+                f"- Số lượng dị biệt phát hiện: {len(detected_indices)} (kỳ vọng chính xác 4 mẫu).",
+            ]
             if unexpected:
-                import warnings
-                warnings.warn(
-                    f"clean_anomalies: Phát hiện thêm quan sát dị biệt ngoài 4 mẫu đã kiểm toán trước ({unexpected}).",
-                    UserWarning,
-                )
+                error_lines.append(f"- Phát hiện mẫu dị biệt ngoài dự kiến: {sorted(list(unexpected))}")
+            if missing:
+                error_lines.append(f"- Không tìm thấy mẫu dị biệt kỳ vọng: {sorted(list(missing))}")
+            error_lines.append(
+                "Dừng pipeline ngay lập tức để bảo vệ dữ liệu. "
+                "Cần kiểm toán và xác minh nguyên nhân trước khi cho phép xử lý tiếp."
+            )
+            raise ValueError("\n".join(error_lines))
 
     if audit_report_path:
         os.makedirs(os.path.dirname(audit_report_path), exist_ok=True)
@@ -159,19 +168,12 @@ def split_data(
     random_state: int = 42,
     auto_clean: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-    """Split dataset into Train and Test sets before any pre-processing or modeling.
+    """[LEGACY / COMPATIBILITY HELPER] Simple 2-way Train/Test split.
 
-    Ensures strict separation to prevent data leakage. If raw data with anomalies is provided,
-    cleaning is strictly executed BEFORE splitting.
-
-    Args:
-        df: Full DataFrame containing features and target.
-        test_size: Ratio of the test set (default 0.2 for 80/20 split).
-        random_state: Random seed for reproducibility.
-        auto_clean: Whether to ensure anomalies are filtered before split if present.
-
-    Returns:
-        Tuple of (X_train, X_test, y_train, y_test).
+    LƯU Ý QUAN TRỌNG:
+    Luồng huấn luyện chính thức (Canonical Workflow) của dự án sử dụng hàm split_train_val_test()
+    để phân chia 3 tập tĩnh: Train (70%) + Validation (15%) + Test (15%) nhằm đảm bảo không rò rỉ dữ liệu.
+    Hàm split_data() chỉ được duy trì nhằm mục đích tương thích ngược với các thử nghiệm 2-way ban đầu.
     """
     if auto_clean:
         # Check if df contains known anomalies and clean before splitting

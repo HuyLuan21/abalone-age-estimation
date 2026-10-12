@@ -208,12 +208,88 @@ def test_predict_explicit_unit_system():
     assert resp2.status_code == 200
 
 
+def test_predict_physical_mode_with_uci_weights_rejected():
+    """Verify that unit_system='physical' strictly rejects UCI-scale weights (Reviewer Item 1)."""
+    sample = {
+        "Sex": "M",
+        "Length": 91.0,  # Physical mm
+        "Diameter": 73.0,  # Physical mm
+        "Height": 19.0,  # Physical mm
+        "Whole_weight": 0.514,  # UCI scale weight (< 4.0 g)
+        "Shucked_weight": 0.2245,
+        "Viscera_weight": 0.101,
+        "Shell_weight": 0.15,
+        "unit_system": "physical",
+    }
+    response = client.post("/api/predict", json=sample)
+    assert response.status_code == 422
+    data = response.json()
+    assert "thang đo UCI" in data["detail"] or "khối lượng" in data["detail"]
+
+
+def test_predict_physical_mode_with_uci_sizes_rejected():
+    """Verify that unit_system='physical' strictly rejects UCI-scale dimensions."""
+    sample = {
+        "Sex": "M",
+        "Length": 0.455,  # UCI scale size (<= 1.5)
+        "Diameter": 0.365,
+        "Height": 0.095,
+        "Whole_weight": 102.8,  # Physical grams
+        "Shucked_weight": 44.9,
+        "Viscera_weight": 20.2,
+        "Shell_weight": 30.0,
+        "unit_system": "physical",
+    }
+    response = client.post("/api/predict", json=sample)
+    assert response.status_code == 422
+    data = response.json()
+    assert "kích thước" in data["detail"] or "thang đo UCI" in data["detail"]
+
+
+def test_predict_uci_mode_with_physical_values_rejected():
+    """Verify that unit_system='uci' strictly rejects physical millimeter or gram values."""
+    sample = {
+        "Sex": "M",
+        "Length": 91.0,  # Physical mm (> 1.5)
+        "Diameter": 73.0,
+        "Height": 19.0,
+        "Whole_weight": 102.8,  # Physical g (> 4.0)
+        "Shucked_weight": 44.9,
+        "Viscera_weight": 20.2,
+        "Shell_weight": 30.0,
+        "unit_system": "uci",
+    }
+    response = client.post("/api/predict", json=sample)
+    assert response.status_code == 422
+    data = response.json()
+    assert "vượt ngưỡng thang UCI" in data["detail"]
+
+
+def test_predict_boundary_cases_auto_unit_detection():
+    """Verify auto-detection rejects borderline mixed-unit requests."""
+    # Length in mm, but weight in UCI scale without unit_system declared
+    sample = {
+        "Sex": "I",
+        "Length": 45.0,  # Physical mm
+        "Diameter": 35.0,
+        "Height": 10.0,
+        "Whole_weight": 0.250,  # UCI scale
+        "Shucked_weight": 0.110,
+        "Viscera_weight": 0.050,
+        "Shell_weight": 0.075,
+    }
+    response = client.post("/api/predict", json=sample)
+    assert response.status_code == 422
+
+
 def test_spa_frontend_serving():
-    """Verify that FastAPI successfully serves frontend SPA index.html when dist exists."""
+    """Verify that FastAPI serves frontend index.html when dist exists, or fallback onboarding HTML when missing."""
     response = client.get("/")
+    assert response.status_code == 200
     if os.path.exists("frontend/dist/index.html"):
-        assert response.status_code == 200
         assert "<div id=\"root\">" in response.text or "vite" in response.text.lower()
+    else:
+        assert "Giao diện Web Frontend chưa được biên dịch" in response.text or "Abalone Age Estimator" in response.text
 
 
 if __name__ == "__main__":
@@ -238,6 +314,14 @@ if __name__ == "__main__":
     print("[PASS] test_predict_mixed_units_rejection")
     test_predict_explicit_unit_system()
     print("[PASS] test_predict_explicit_unit_system")
+    test_predict_physical_mode_with_uci_weights_rejected()
+    print("[PASS] test_predict_physical_mode_with_uci_weights_rejected")
+    test_predict_physical_mode_with_uci_sizes_rejected()
+    print("[PASS] test_predict_physical_mode_with_uci_sizes_rejected")
+    test_predict_uci_mode_with_physical_values_rejected()
+    print("[PASS] test_predict_uci_mode_with_physical_values_rejected")
+    test_predict_boundary_cases_auto_unit_detection()
+    print("[PASS] test_predict_boundary_cases_auto_unit_detection")
     test_spa_frontend_serving()
     print("[PASS] test_spa_frontend_serving")
-    print("\n[SUCCESS] ALL 11 API & FULLSTACK UNIT TESTS PASSED SUCCESSFULLY!")
+    print("\n[SUCCESS] ALL 15 API & FULLSTACK UNIT TESTS PASSED SUCCESSFULLY!")

@@ -265,6 +265,59 @@ def test_model_locking_precedence_over_test_evaluation():
         )
 
 
+def test_anomaly_safety_halt_on_unexpected_deviation():
+    """Verify that clean_anomalies strictly halts with ValueError if unexpected anomalies appear."""
+    raw_df = load_data("data/raw/abalone.data")
+    assert len(raw_df) == 4177
+
+    # Inject an artificial anomaly at row index 100 (Height = -1.0)
+    modified_df = raw_df.copy()
+    modified_df.loc[100, "Height"] = -1.0
+
+    try:
+        clean_anomalies(modified_df, audit_report_path=None)
+        assert False, "clean_anomalies should have raised ValueError when an unexpected anomaly is detected!"
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        assert "LỖI TOÀN VẸN DỮ LIỆU" in err_msg
+        assert "Phát hiện mẫu dị biệt ngoài dự kiến" in err_msg
+
+
+def test_clean_data_end_to_end_in_temp_dir():
+    """Execute complete ML pipeline lifecycle inside an isolated temporary directory."""
+    import tempfile
+    from src.evaluate import calculate_metrics
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        raw_df = load_data("data/raw/abalone.data")
+        temp_audit_path = os.path.join(tmp_dir, "audit_anomalies.csv")
+        clean_df, anomalies = clean_anomalies(raw_df, audit_report_path=temp_audit_path)
+        assert os.path.exists(temp_audit_path)
+        assert len(clean_df) == 4173
+
+        # 3-Way split
+        X_train, X_val, X_test, y_train, y_val, y_test = split_train_val_test(clean_df)
+        X_train_val = pd.concat([X_train, X_val], ignore_index=True)
+        y_train_val = pd.concat([y_train, y_val], ignore_index=True)
+        assert len(X_train_val) == 3547
+
+        # Build, fit, and serialize pipeline from scratch
+        pipeline = build_knn_pipeline(n_neighbors=17, weights="distance", with_scaling=False)
+        pipeline.fit(X_train_val, y_train_val)
+
+        temp_model_path = os.path.join(tmp_dir, "test_knn.pkl")
+        joblib.dump(pipeline, temp_model_path)
+        assert os.path.exists(temp_model_path)
+
+        # Reload and predict
+        loaded_pipeline = joblib.load(temp_model_path)
+        preds = loaded_pipeline.predict(X_test)
+        metrics = calculate_metrics(y_test.to_numpy(), preds)
+
+        assert 1.0 < metrics["MAE"] < 2.0
+        assert 0.5 < metrics["R2"] < 0.7
+
+
 if __name__ == "__main__":
     print("Running pipeline verification test suite...")
     test_anomaly_removal_and_sample_count()
@@ -285,6 +338,10 @@ if __name__ == "__main__":
     print("[PASS] test_held_out_test_evaluation_protocol")
     test_model_locking_precedence_over_test_evaluation()
     print("[PASS] test_model_locking_precedence_over_test_evaluation")
-    print("\n[SUCCESS] ALL PIPELINE UNIT TESTS PASSED SUCCESSFULLY!")
+    test_anomaly_safety_halt_on_unexpected_deviation()
+    print("[PASS] test_anomaly_safety_halt_on_unexpected_deviation")
+    test_clean_data_end_to_end_in_temp_dir()
+    print("[PASS] test_clean_data_end_to_end_in_temp_dir")
+    print("\n[SUCCESS] ALL 11 PIPELINE UNIT TESTS PASSED SUCCESSFULLY!")
 
 

@@ -17,11 +17,19 @@ if sys.platform == "win32":
         pass
 
 if __name__ == "__main__":
+    frontend_dist_index = os.path.join(PROJECT_ROOT, "frontend", "dist", "index.html")
+    has_frontend_build = os.path.exists(frontend_dist_index)
+
     print("=" * 70)
-    print("🚀 Khởi động Abalone Age Estimation Fullstack Server (Backend + Frontend)...")
-    print("👉 Ứng dụng Web (Frontend UI)        : http://127.0.0.1:8000/")
-    print("👉 Swagger UI (Tài liệu API tương tác): http://127.0.0.1:8000/docs")
-    print("👉 ReDoc                              : http://127.0.0.1:8000/redoc")
-    print("👉 Health Check Endpoint             : http://127.0.0.1:8000/api/health")
+    print("🚀 Khởi động Abalone Age Estimation Server...")
+    if has_frontend_build:
+        print("✅ Giao diện Web (Production Build)    : http://127.0.0.1:8000/")
+    else:
+        print("⚠️  Giao diện Web chưa build (Repo mới): http://127.0.0.1:8000/ (Trang hướng dẫn)")
+        print("💡 Để build giao diện chính thức       : cd frontend && npm install && npm run build")
+        print("💡 Hoặc chạy Vite dev server độc lập   : cd frontend && npm run dev (http://localhost:5173)")
+    print("👉 Swagger UI (Tài liệu API tương tác) : http://127.0.0.1:8000/docs")
+    print("👉 ReDoc                               : http://127.0.0.1:8000/redoc")
+    print("👉 Health Check Endpoint              : http://127.0.0.1:8000/api/health")
     print("=" * 70)
     uvicorn.run("app.api:app", host="127.0.0.1", port=8000, reload=True)

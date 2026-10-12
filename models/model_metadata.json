@@ -30,7 +30,7 @@
     "python_version": "3.14.6",
     "platform": "win32",
     "sklearn_version": "1.9.1",
-    "numpy_version": "2.5.4",
+    "numpy_version": "2.5.3",
     "pandas_version": "3.0.6"
   },
   "pipeline_steps": [
