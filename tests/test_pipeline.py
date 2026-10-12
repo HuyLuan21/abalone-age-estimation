@@ -173,9 +173,9 @@ def test_held_out_test_evaluation_protocol():
                 assert pd.isna(row["Test_MAE"]), "Ablation candidate model must NOT have Test_MAE evaluated!"
                 assert pd.isna(row["Test_R2"]), "Ablation candidate model must NOT have Test_R2 evaluated!"
 
-        # Identify locked model
-        locked_rows = df_res[df_res["Model"].str.contains("Locked Final Model|Selected & Locked", case=False, na=False)]
-        assert len(locked_rows) >= 1, "Must contain locked model row in results"
+        # Identify locked and refitted model
+        locked_rows = df_res[df_res["Model"].str.contains("Locked Final Model|Selected & Locked|Refitted", case=False, na=False)]
+        assert len(locked_rows) >= 1, "Must contain locked/refitted model row in results"
         for _, row in locked_rows.iterrows():
             assert not pd.isna(row["Test_MAE"]), "Locked model must have valid Test_MAE!"
             assert row["Test_MAE"] > 0, "Test_MAE must be positive"

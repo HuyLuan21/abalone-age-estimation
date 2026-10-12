@@ -37,6 +37,7 @@ from src.train import (
     get_ablation_cv_summary,
     select_best_hyperparameters,
     train_final_model,
+    refit_final_model,
     save_model_pipeline,
     save_cv_results,
     save_model_metadata,
@@ -182,83 +183,114 @@ def run_pipeline(
     for _, row in cv_ablation_df.iterrows():
         print(f"    - {row['Preprocessing']:14s}: Best K={row['Best_K']:2d}, Weights='{row['Best_Weights']}', CV MAE={row['CV_MAE']:.4f} +/- {row['CV_STD']:.4f}")
 
-    # Select best configurations based STRICTLY on Train CV
-    best_overall_config = select_best_hyperparameters(cv_results_df, force_scaling=None)
+    # Select best candidate configurations from 5-Fold Train CV
     best_scaled_config = select_best_hyperparameters(cv_results_df, force_scaling=True)
     best_unscaled_config = select_best_hyperparameters(cv_results_df, force_scaling=False)
 
-    best_k = best_overall_config["best_k"]
-    best_weights = best_overall_config["best_weights"]
-    best_scaling = best_overall_config["best_scaling"]
-    with_scaling = best_overall_config["with_scaling"]
+    print("\n  [OK] Best Candidates from 5-Fold Train CV:")
+    print(f"    - Candidate A (StandardScaler): K = {best_scaled_config['best_k']}, Weights = '{best_scaled_config['best_weights']}', CV MAE = {best_scaled_config['best_cv_mae']:.4f} +/- {best_scaled_config['best_cv_std']:.4f}")
+    print(f"    - Candidate B (No Scale)     : K = {best_unscaled_config['best_k']}, Weights = '{best_unscaled_config['best_weights']}', CV MAE = {best_unscaled_config['best_cv_mae']:.4f} +/- {best_unscaled_config['best_cv_std']:.4f}")
 
-    print(f"\n  [OK] Best Configuration from Train CV ({best_scaling}): K = {best_k}, Weights = '{best_weights}'")
-    print(f"  [OK] Best Overall CV MAE    : {best_overall_config['best_cv_mae']:.4f} +/- {best_overall_config['best_cv_std']:.4f}")
-    print(f"  [OK] Best Scaled CV MAE     : {best_scaled_config['best_cv_mae']:.4f} (K={best_scaled_config['best_k']}, Weights='{best_scaled_config['best_weights']}')")
-    print(f"  [OK] Best Unscaled CV MAE   : {best_unscaled_config['best_cv_mae']:.4f} (K={best_unscaled_config['best_k']}, Weights='{best_unscaled_config['best_weights']}')")
-
-    # 6. Validation Set Evaluation & Model Locking (Hold-out Validation Confirmation)
-    print("\n[6/8] Evaluating candidate models on Validation Set (Hold-out Validation)...")
-    primary_pipeline = train_final_model(
+    # 6. Validation Set Evaluation & Model Selection (Vòng tuyển chọn trên Validation 15%)
+    print("\n[6/8] Evaluating candidate models on Validation Set (Model Selection Arbitrator)...")
+    
+    # Train Candidate A on Train 70% and evaluate on Val 15%
+    pipe_scaled = train_final_model(
         X_train,
         y_train,
+        n_neighbors=best_scaled_config["best_k"],
+        weights=best_scaled_config["best_weights"],
+        with_scaling=True,
+    )
+    val_pred_scaled = pipe_scaled.predict(X_val)
+    val_metrics_scaled = calculate_metrics(y_val, val_pred_scaled)
+
+    # Train Candidate B on Train 70% and evaluate on Val 15%
+    pipe_unscaled = train_final_model(
+        X_train,
+        y_train,
+        n_neighbors=best_unscaled_config["best_k"],
+        weights=best_unscaled_config["best_weights"],
+        with_scaling=False,
+    )
+    val_pred_unscaled = pipe_unscaled.predict(X_val)
+    val_metrics_unscaled = calculate_metrics(y_val, val_pred_unscaled)
+
+    # Arbitrate and Lock Configuration based on Validation MAE
+    if val_metrics_scaled["MAE"] <= val_metrics_unscaled["MAE"]:
+        locked_scaling = "StandardScaler"
+        locked_with_scaling = True
+        locked_config = best_scaled_config
+        winning_val_metrics = val_metrics_scaled
+        eliminated_scaling = "No Scale"
+        eliminated_val_metrics = val_metrics_unscaled
+    else:
+        locked_scaling = "No Scale"
+        locked_with_scaling = False
+        locked_config = best_unscaled_config
+        winning_val_metrics = val_metrics_unscaled
+        eliminated_scaling = "StandardScaler"
+        eliminated_val_metrics = val_metrics_scaled
+
+    best_k = locked_config["best_k"]
+    best_weights = locked_config["best_weights"]
+    best_scaling = locked_scaling
+    with_scaling = locked_with_scaling
+
+    print(f"  [DECISION] Validation Set Selected: '{locked_scaling}'")
+    print(f"             - {locked_scaling} Val MAE: {winning_val_metrics['MAE']:.4f} (RMSE: {winning_val_metrics['RMSE']:.4f}, R2: {winning_val_metrics['R2']:.4f})")
+    print(f"             - {eliminated_scaling} Val MAE: {eliminated_val_metrics['MAE']:.4f} (RMSE: {eliminated_val_metrics['RMSE']:.4f}, R2: {eliminated_val_metrics['R2']:.4f})")
+    print(f"  [LOCKED] Configuration Locked: K={best_k}, weights='{best_weights}', scaling='{locked_scaling}'")
+
+    val_records = [
+        {"Model": "Median Baseline", "Status": "Benchmark", **baseline_val_metrics},
+        {
+            "Model": "KNN - StandardScaler",
+            "Status": "Selected & Locked" if locked_with_scaling else "Eliminated",
+            **val_metrics_scaled,
+        },
+        {
+            "Model": "KNN - No Scale",
+            "Status": "Selected & Locked" if not locked_with_scaling else "Eliminated",
+            **val_metrics_unscaled,
+        },
+    ]
+    val_results_df = pd.DataFrame(val_records)
+    val_results_df.to_csv("reports/validation_results.csv", index=False)
+    print("  [OK] Saved reports/validation_results.csv")
+    print("  [OK] Validation Set Results Table:")
+    print(val_results_df.round(4).to_string(index=False))
+
+    # 7. Refit Locked Pipeline on Combined Train + Validation (85% Data)
+    print("\n[7/8] Refitting locked configuration on combined Train + Validation (85% of data)...")
+    X_train_val = pd.concat([X_train, X_val], ignore_index=True)
+    y_train_val = pd.concat([y_train, y_val], ignore_index=True)
+    print(f"  [OK] Combined partition size: {len(X_train_val)} samples ({len(X_train_val)/len(clean_df)*100:.2f}%)")
+
+    refitted_pipeline = refit_final_model(
+        X_train_val,
+        y_train_val,
         n_neighbors=best_k,
         weights=best_weights,
         with_scaling=with_scaling,
     )
-    primary_val_pred = primary_pipeline.predict(X_val)
-    primary_val_metrics = calculate_metrics(y_val, primary_val_pred)
+    save_model_pipeline(refitted_pipeline, "models/abalone_knn_pipeline.pkl")
+    print(f"  [SAVED] Refitted pipeline persisted to models/abalone_knn_pipeline.pkl ({best_scaling})")
 
-    # Fit alternative ablation model for comparison on Validation set
-    alt_scaling = not with_scaling
-    alt_config = best_scaled_config if alt_scaling else best_unscaled_config
-    alt_pipeline = build_knn_pipeline(
-        n_neighbors=alt_config["best_k"],
-        weights=alt_config["best_weights"],
-        with_scaling=alt_scaling,
-    )
-    alt_pipeline.fit(X_train, y_train)
-    alt_val_pred = alt_pipeline.predict(X_val)
-    alt_val_metrics = calculate_metrics(y_val, alt_val_pred)
+    # Compute updated feature statistics on the full serving dataset (85%)
+    serving_feature_stats = compute_feature_statistics(X_train_val)
 
-    val_records = [
-        {"Model": "Median Baseline", **baseline_val_metrics},
-    ]
-    if with_scaling:
-        val_records.append({"Model": "KNN - No Scale", **alt_val_metrics})
-        val_records.append({"Model": "KNN - StandardScaler", **primary_val_metrics})
-    else:
-        val_records.append({"Model": "KNN - No Scale", **primary_val_metrics})
-        val_records.append({"Model": "KNN - StandardScaler", **alt_val_metrics})
-
-    val_results_df = pd.DataFrame(val_records)
-    val_results_df.to_csv("reports/validation_results.csv", index=False)
-    print("  [OK] Saved reports/validation_results.csv")
-    print("  [OK] Validation Set Results:")
-    print(val_results_df.round(4).to_string(index=False))
-
-    # Lock primary model artifact BEFORE opening test set
-    save_model_pipeline(primary_pipeline, "models/abalone_knn_pipeline.pkl")
-    print(f"\n  [LOCKED] Primary model pipeline artifact saved to models/abalone_knn_pipeline.pkl ({best_scaling})")
-
-    # 7. Final Independent Test Set Evaluation (Held-out Evaluation - Opened ONLY ONCE)
-    print("\n[7/8] Evaluating locked model independently on Held-out Test set (Final Evaluation)...")
-    final_test_pred = primary_pipeline.predict(X_test)
+    # 8. Final Independent Test Set Evaluation (Held-out Test - Opened EXACTLY ONCE)
+    print("\n[8/8] Evaluating refitted model independently on Held-out Test set (Final Evaluation)...")
+    final_test_pred = refitted_pipeline.predict(X_test)
     final_test_metrics = calculate_metrics(y_test, final_test_pred)
 
-    # Evaluate baseline benchmark on Test partition at the same time (strictly after model locking)
     baseline_test_pred = np.full(shape=len(y_test), fill_value=baseline_val)
     baseline_test_metrics = calculate_metrics(y_test, baseline_test_pred)
 
     print(f"  [OK] Baseline Held-out Test MAE: {baseline_test_metrics['MAE']:.4f}")
-    print(f"  [OK] Locked Model Test MAE     : {final_test_metrics['MAE']:.4f} (RMSE: {final_test_metrics['RMSE']:.4f}, R2: {final_test_metrics['R2']:.4f})")
+    print(f"  [OK] Final Model Test MAE      : {final_test_metrics['MAE']:.4f} (RMSE: {final_test_metrics['RMSE']:.4f}, R2: {final_test_metrics['R2']:.4f})")
 
-    # TUÂN THỦ NGUYÊN TẮC NIÊM PHONG TẬP TEST (ZERO DATA LEAKAGE PROTOCOL):
-    # alt_pipeline TUYỆT ĐỐI KHÔNG được gọi trên tập Test.
-    # Việc đối sánh giữa No Scale và StandardScaler đã được hoàn thành khách quan tại bước 5-Fold CV và Validation Set.
-    # Tập Test chỉ mở đúng 1 lần duy nhất để báo cáo hiệu năng mô hình đã chốt (primary_pipeline).
-
-    # Assemble comprehensive results table with both Validation and Test metrics
     test_records = [
         {
             "Model": "Median Baseline",
@@ -274,11 +306,11 @@ def run_pipeline(
             "R2": baseline_test_metrics["R2"],
         },
         {
-            "Model": f"KNN - {best_scaling} (Selected & Locked)",
-            "Selection_Stage": "Selected by CV & Locked on Val",
-            "Val_MAE": primary_val_metrics["MAE"],
-            "Val_RMSE": primary_val_metrics["RMSE"],
-            "Val_R2": primary_val_metrics["R2"],
+            "Model": f"KNN - {best_scaling} (Refitted on 85%)",
+            "Selection_Stage": "Selected by Validation & Refitted",
+            "Val_MAE": winning_val_metrics["MAE"],
+            "Val_RMSE": winning_val_metrics["RMSE"],
+            "Val_R2": winning_val_metrics["R2"],
             "Test_MAE": final_test_metrics["MAE"],
             "Test_RMSE": final_test_metrics["RMSE"],
             "Test_R2": final_test_metrics["R2"],
@@ -287,11 +319,11 @@ def run_pipeline(
             "R2": final_test_metrics["R2"],
         },
         {
-            "Model": f"KNN - {'StandardScaler' if not with_scaling else 'No Scale'} (Ablation Candidate)",
+            "Model": f"KNN - {eliminated_scaling} (Eliminated on Val)",
             "Selection_Stage": "Eliminated on Validation",
-            "Val_MAE": alt_val_metrics["MAE"],
-            "Val_RMSE": alt_val_metrics["RMSE"],
-            "Val_R2": alt_val_metrics["R2"],
+            "Val_MAE": eliminated_val_metrics["MAE"],
+            "Val_RMSE": eliminated_val_metrics["RMSE"],
+            "Val_R2": eliminated_val_metrics["R2"],
             "Test_MAE": np.nan,
             "Test_RMSE": np.nan,
             "Test_R2": np.nan,
@@ -309,8 +341,8 @@ def run_pipeline(
     group_mae = analyze_errors_by_age_group(y_test, final_test_pred)
     save_evaluation_tables(results_df, group_mae, "reports", cv_ablation_df=cv_ablation_df)
 
-    # 8. Save Comprehensive Model and Dataset Metadata
-    print("\n[8/8] Synchronizing dynamic metadata (models/model_metadata.json)...")
+    # 9. Save Comprehensive Model and Dataset Metadata
+    print("\nSynchronizing dynamic metadata (models/model_metadata.json)...")
     pipeline_steps_list = (
         [
             "StandardScaler (7 numerical features)",
@@ -329,21 +361,25 @@ def run_pipeline(
         "algorithm": "K-Nearest Neighbors Regressor with Euclidean Distance",
         "dataset_source": "UCI Machine Learning Repository (DOI: 10.24432/C55C7W)",
         "intended_use": "Hỗ trợ nghiên cứu nuôi trồng và sàng lọc mẫu bào ngư cần kiểm tra vi thể.",
+        "workflow": "3-Stage Protocol: Train 70% CV -> Validation 15% Selection -> Refit on Train+Val 85% -> Final Test 15%",
         "data_split": {
             "train_samples": int(len(X_train)),
             "validation_samples": int(len(X_val)),
             "test_samples": int(len(X_test)),
+            "refit_samples": int(len(X_train_val)),
             "train_ratio": float(train_ratio),
             "val_ratio": float(val_ratio),
             "test_ratio": float(test_ratio),
+            "refit_ratio": round(float(train_ratio + val_ratio), 2),
             "random_state": int(random_state),
-            "total_clean_samples": int(len(X_train) + len(X_val) + len(X_test)),
+            "total_clean_samples": int(len(clean_df)),
             "removed_anomalies": int(len(anomalies_df)),
         },
-        "total_training_samples": int(len(X_train)),
+        "total_training_samples": int(len(X_train_val)),
+        "initial_training_samples": int(len(X_train)),
         "total_validation_samples": int(len(X_val)),
         "total_test_samples": int(len(X_test)),
-        "valid_sex_values": sorted(list(X_train["Sex"].unique())),
+        "valid_sex_values": sorted(list(X_train_val["Sex"].unique())),
         "system_environment": {
             "python_version": sys.version.split()[0],
             "platform": sys.platform,
@@ -359,19 +395,23 @@ def run_pipeline(
             "scaling": best_scaling,
             "cv_folds": cv_folds,
             "random_state": random_state,
+            "refit_on_train_val": True,
         },
         "cv_performance": {
             "best_scaled_cv_mae": round(float(best_scaled_config["best_cv_mae"]), 4),
             "best_scaled_cv_std": round(float(best_scaled_config["best_cv_std"]), 4),
             "best_unscaled_cv_mae": round(float(best_unscaled_config["best_cv_mae"]), 4),
             "best_unscaled_cv_std": round(float(best_unscaled_config["best_cv_std"]), 4),
-            "selected_cv_mae": round(float(best_overall_config["best_cv_mae"]), 4),
-            "selected_cv_std": round(float(best_overall_config["best_cv_std"]), 4),
+            "selected_cv_mae": round(float(locked_config["best_cv_mae"]), 4),
+            "selected_cv_std": round(float(locked_config["best_cv_std"]), 4),
         },
         "validation_performance": {
-            "Validation_MAE": round(float(primary_val_metrics["MAE"]), 4),
-            "Validation_RMSE": round(float(primary_val_metrics["RMSE"]), 4),
-            "Validation_R2": round(float(primary_val_metrics["R2"]), 4),
+            "Selected_Model": f"KNN - {best_scaling}",
+            "Validation_MAE": round(float(winning_val_metrics["MAE"]), 4),
+            "Validation_RMSE": round(float(winning_val_metrics["RMSE"]), 4),
+            "Validation_R2": round(float(winning_val_metrics["R2"]), 4),
+            "Eliminated_Model": f"KNN - {eliminated_scaling}",
+            "Eliminated_Val_MAE": round(float(eliminated_val_metrics["MAE"]), 4),
             "Baseline_Validation_MAE": round(float(baseline_val_metrics["MAE"]), 4),
         },
         "performance_metrics": {
@@ -388,11 +428,12 @@ def run_pipeline(
         "limitations": [
             f"Mô hình đạt độ chính xác cao nhất ở nhóm non (MAE = {group_mae['Young']:.3f}) và trung bình (MAE = {group_mae['Middle']:.3f}).",
             f"Sai số tăng cao rõ rệt ở nhóm già (>12 vòng, MAE = {group_mae['Old']:.3f}) do mật độ cá thể già ít và sinh trưởng phi tuyến tính.",
-            "Quy trình so sánh mô hình (Scaling vs No-Scale) được chọn dựa trên 5-Fold Cross-Validation trên Train để bảo đảm không rò rỉ tập Test.",
-            "Tập Validation độc lập xác nhận hiệu năng mô hình trước khi đánh giá một lần duy nhất trên tập Test.",
+            "Quy trình so sánh mô hình (Scaling vs No-Scale) được chọn dựa trên kết quả độc lập của tập Validation (15%) sau khi tìm siêu tham số trên Train (70%).",
+            "Mô hình cuối cùng được refit trên toàn bộ Train + Validation (85% dữ liệu) để mở rộng kho láng giềng k-NN và tối ưu hiệu năng trước khi đánh giá Test.",
+            "Tập Test được niêm phong hoàn toàn và chỉ mở đúng 1 lần duy nhất để báo cáo hiệu năng độc lập.",
             "Ước lượng hỗ trợ sàng lọc sơ bộ, không thay thế quy trình cắt vỏ và đếm vòng kính hiển vi tiêu chuẩn.",
         ],
-        "feature_statistics": feature_stats,
+        "feature_statistics": serving_feature_stats,
     }
     save_model_metadata(model_metadata, "models/model_metadata.json")
     print("  [OK] Saved models/model_metadata.json (Dynamic API synchronization)")

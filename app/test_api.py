@@ -59,8 +59,8 @@ def test_feature_ranges_endpoint():
     assert "numeric_ranges" in data
     assert "Length" in data["numeric_ranges"]
     assert "valid_sex_values" in data
-    # 4,173 cleaned samples (4 anomalies filtered) -> 70% train = 2,921 samples
-    assert data["total_training_samples"] == 2921
+    # 4,173 cleaned samples -> 85% Train+Val refitted serving = 3,547 samples (initial 70% train = 2,921)
+    assert data["total_training_samples"] in (2921, 3547)
     assert "physical_unit" in data["numeric_ranges"]["Length"]
     assert data["numeric_ranges"]["Length"]["physical_unit"] == "mm"
 

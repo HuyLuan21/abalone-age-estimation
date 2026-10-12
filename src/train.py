@@ -165,6 +165,38 @@ def train_final_model(
     return pipeline
 
 
+def refit_final_model(
+    X_train_val: pd.DataFrame,
+    y_train_val: pd.Series,
+    n_neighbors: int,
+    weights: str = "distance",
+    with_scaling: bool = True,
+) -> Pipeline:
+    """Refit the locked pipeline on combined Train + Validation partition (85% of data).
+
+    Re-fits the entire pipeline from scratch (including StandardScaler, OneHotEncoder,
+    and KNeighborsRegressor) using the exact configuration chosen during Validation selection.
+    Ensures zero leakage to the held-out Test set while maximizing training sample density.
+
+    Args:
+        X_train_val: Combined Train and Validation features (e.g. 85% data).
+        y_train_val: Combined Train and Validation targets.
+        n_neighbors: Number of neighbors locked from validation.
+        weights: Neighbor weighting scheme locked from validation.
+        with_scaling: Whether to scale features locked from validation.
+
+    Returns:
+        Pipeline: Re-fitted scikit-learn Pipeline on 85% data for production serving & test evaluation.
+    """
+    pipeline = build_knn_pipeline(
+        n_neighbors=n_neighbors,
+        weights=weights,
+        with_scaling=with_scaling,
+    )
+    pipeline.fit(X_train_val, y_train_val)
+    return pipeline
+
+
 def save_model_pipeline(
     pipeline: Pipeline,
     filepath: str = "models/abalone_knn_pipeline.pkl",

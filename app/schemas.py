@@ -235,8 +235,8 @@ class ModelCardResponse(BaseModel):
     pipeline_steps: List[str]
     hyperparameters: Dict[str, object]
     performance_metrics: Dict[str, float]
-    validation_performance: Optional[Dict[str, float]] = None
-    cv_performance: Optional[Dict[str, float]] = None
+    validation_performance: Optional[Dict[str, Any]] = None
+    cv_performance: Optional[Dict[str, Any]] = None
     data_split: Optional[Dict[str, Any]] = None
     age_group_mae: Dict[str, float]
     dataset_source: str = "UCI Machine Learning Repository (DOI: 10.24432/C55C7W)"

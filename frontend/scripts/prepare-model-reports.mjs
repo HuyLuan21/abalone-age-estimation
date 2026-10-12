@@ -83,9 +83,15 @@ const featureStatistics = Object.fromEntries(
   ]),
 )
 
-if (cleanedSampleCount !== trainingSampleCount + testSampleCount) {
+const validationSampleCount = metadata.data_split?.validation_samples
+  ? number(metadata.data_split.validation_samples, 'model_metadata.json validation_samples')
+  : 0
+
+const matchesRefittedSplit = cleanedSampleCount === trainingSampleCount + testSampleCount
+const matchesInitialSplit = cleanedSampleCount === (metadata.initial_training_samples ?? trainingSampleCount) + validationSampleCount + testSampleCount
+if (!matchesRefittedSplit && !matchesInitialSplit) {
   throw new Error(
-    `Data-count mismatch: ${rawSampleCount} raw - ${removedSampleCount} removed = ${cleanedSampleCount} cleaned, but metadata reports ${trainingSampleCount} train + ${testSampleCount} test.`,
+    `Data-count mismatch: ${rawSampleCount} raw - ${removedSampleCount} removed = ${cleanedSampleCount} cleaned, but metadata reports ${trainingSampleCount} train + ${validationSampleCount} val + ${testSampleCount} test.`,
   )
 }
 
@@ -98,12 +104,14 @@ if (expectedGroups.some((group) => !ageGroupMae.some((row) => row.group === grou
   throw new Error('age_group_mae.csv is missing one or more expected age groups.')
 }
 
-const modelResults = modelRows.map((row) => ({
-  model: row.Model,
-  mae: number(row.MAE, `model_results.csv ${row.Model} MAE`),
-  rmse: number(row.RMSE, `model_results.csv ${row.Model} RMSE`),
-  r2: number(row.R2, `model_results.csv ${row.Model} R2`),
-}))
+const modelResults = modelRows
+  .filter((row) => row.MAE !== '' && row.MAE !== undefined && !Number.isNaN(Number(row.MAE)))
+  .map((row) => ({
+    model: row.Model,
+    mae: number(row.MAE, `model_results.csv ${row.Model} MAE`),
+    rmse: number(row.RMSE, `model_results.csv ${row.Model} RMSE`),
+    r2: number(row.R2, `model_results.csv ${row.Model} R2`),
+  }))
 const cvAblation = ablationRows.map((row) => ({
   preprocessing: row.Preprocessing,
   bestK: number(row.Best_K, `cv_ablation.csv ${row.Preprocessing} K`),
@@ -139,7 +147,9 @@ const payload = {
     rawSamples: rawSampleCount,
     removedSamples: removedSampleCount,
     cleanedSamples: cleanedSampleCount,
-    trainingSamples: trainingSampleCount,
+    trainingSamples: metadata.initial_training_samples ?? trainingSampleCount,
+    validationSamples: validationSampleCount,
+    refitSamples: trainingSampleCount,
     testSamples: testSampleCount,
   },
   modelResults,
