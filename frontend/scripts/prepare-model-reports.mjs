@@ -108,6 +108,7 @@ const modelResults = modelRows
   .filter((row) => row.MAE !== '' && row.MAE !== undefined && !Number.isNaN(Number(row.MAE)))
   .map((row) => ({
     model: row.Model,
+    selectionStage: row.Selection_Stage,
     mae: number(row.MAE, `model_results.csv ${row.Model} MAE`),
     rmse: number(row.RMSE, `model_results.csv ${row.Model} RMSE`),
     r2: number(row.R2, `model_results.csv ${row.Model} R2`),

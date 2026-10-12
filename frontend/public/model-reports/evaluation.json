@@ -21,12 +21,14 @@
   "modelResults": [
     {
       "model": "Median Baseline",
+      "selectionStage": "Baseline Benchmark",
       "mae": 2.5654952076677318,
       "rmse": 3.6592043339812927,
       "r2": -0.09915480117675934
     },
     {
       "model": "KNN - No Scale (Refitted on 85%)",
+      "selectionStage": "Selected by Validation & Refitted",
       "mae": 1.5017629500173868,
       "rmse": 2.2566628719308293,
       "r2": 0.5819589736509762

@@ -292,6 +292,27 @@ def test_spa_frontend_serving():
         assert "Giao diện Web Frontend chưa được biên dịch" in response.text or "Abalone Age Estimator" in response.text
 
 
+def test_predict_valid_small_juvenile_physical_sample():
+    """Verify that a valid small juvenile abalone with small physical weight (<4g) is accepted (P1 issue)."""
+    # Equivalent to UCI min sample: Length 15mm (=0.075 UCI), Whole_weight 0.40g (=0.002 UCI)
+    juvenile_sample = {
+        "Sex": "I",
+        "Length": 15.0,
+        "Diameter": 11.0,
+        "Height": 2.0,
+        "Whole_weight": 0.40,
+        "Shucked_weight": 0.20,
+        "Viscera_weight": 0.10,
+        "Shell_weight": 0.10,
+        "unit_system": "physical",
+    }
+    response = client.post("/api/predict", json=juvenile_sample)
+    assert response.status_code == 200, f"Juvenile physical sample rejected: {response.text}"
+    data = response.json()
+    assert "predicted_rings" in data
+    assert data["predicted_rings"] > 0
+
+
 if __name__ == "__main__":
     print("Running automated API tests...")
     test_health_endpoint()
@@ -304,6 +325,8 @@ if __name__ == "__main__":
     print("[PASS] test_predict_valid_sample")
     test_predict_physical_units_sample()
     print("[PASS] test_predict_physical_units_sample")
+    test_predict_valid_small_juvenile_physical_sample()
+    print("[PASS] test_predict_valid_small_juvenile_physical_sample")
     test_predict_out_of_distribution_warning()
     print("[PASS] test_predict_out_of_distribution_warning")
     test_predict_invalid_diameter_greater_than_length()
@@ -324,4 +347,4 @@ if __name__ == "__main__":
     print("[PASS] test_predict_boundary_cases_auto_unit_detection")
     test_spa_frontend_serving()
     print("[PASS] test_spa_frontend_serving")
-    print("\n[SUCCESS] ALL 15 API & FULLSTACK UNIT TESTS PASSED SUCCESSFULLY!")
+    print("\n[SUCCESS] ALL 16 API & FULLSTACK UNIT TESTS PASSED SUCCESSFULLY!")

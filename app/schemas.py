@@ -79,21 +79,26 @@ class AbaloneInput(BaseModel):
 
         is_physical_like_size = any(s > 2.0 for s in [self.Length, self.Diameter]) or self.Height > 1.5
         is_uci_like_size = all(s <= 1.5 for s in sizes) and self.Height <= 0.6
-
-        is_physical_like_weight = any(w > 5.0 for w in weights) or (self.Length > 10.0 and self.Whole_weight > 3.0)
         is_uci_like_weight = all(w <= 4.0 for w in weights)
 
         if self.unit_system == "physical":
-            if is_uci_like_size or not is_physical_like_size:
+            if is_uci_like_size or self.Length <= 1.5 or self.Diameter <= 1.5:
                 raise ValueError(
                     "Trường unit_system='physical' nhưng kích thước (Length, Diameter, Height) đang dùng thang đo UCI (<= 1.5). "
                     "Vui lòng cung cấp toàn bộ kích thước theo mm thực tế hoặc đặt unit_system='uci'."
                 )
-            if is_uci_like_weight or (self.Length > 10.0 and self.Whole_weight <= 3.0):
+            # Mixed-unit check: Medium/adult abalone (Length >= 40mm) cannot physically weigh <= 4.0g
+            if self.Length >= 40.0 and self.Whole_weight <= 4.0:
                 raise ValueError(
-                    f"Trường unit_system='physical' nhưng phát hiện khối lượng dùng thang đo UCI "
-                    f"(Whole_weight={self.Whole_weight} <= 3.0g khi chiều dài là {self.Length}mm). "
-                    "Vui lòng cung cấp toàn bộ khối lượng theo gam thực tế hoặc đặt unit_system='uci'."
+                    f"Trường unit_system='physical' nhưng phát hiện khối lượng không tương thích: "
+                    f"Chiều dài vỏ {self.Length}mm không thể chỉ nặng {self.Whole_weight}g "
+                    "(dữ liệu đang trộn giữa kích thước mm và khối lượng theo thang đo UCI). "
+                    "Vui lòng cung cấp khối lượng theo gam thực tế hoặc đặt unit_system='uci'."
+                )
+            if self.Whole_weight < 0.1:
+                raise ValueError(
+                    f"Trường unit_system='physical' nhưng Tổng khối lượng (Whole_weight={self.Whole_weight}g) "
+                    "quá nhỏ (< 0.1g), nằm ngoài giới hạn sinh học của tập dữ liệu."
                 )
             is_physical = True
         elif self.unit_system == "uci":
@@ -102,7 +107,7 @@ class AbaloneInput(BaseModel):
                     "Trường unit_system='uci' nhưng phát hiện kích thước vượt ngưỡng thang UCI (Length/Diameter > 1.5 hoặc Height > 0.6). "
                     "Vui lòng cung cấp toàn bộ giá trị theo thang UCI đã chia 200 hoặc đặt unit_system='physical'."
                 )
-            if not is_uci_like_weight or is_physical_like_weight:
+            if not is_uci_like_weight or any(w > 4.0 for w in weights):
                 raise ValueError(
                     "Trường unit_system='uci' nhưng phát hiện khối lượng vượt ngưỡng thang UCI (Weight > 4.0). "
                     "Vui lòng cung cấp toàn bộ giá trị theo thang UCI đã chia 200 hoặc đặt unit_system='physical'."
@@ -110,20 +115,24 @@ class AbaloneInput(BaseModel):
             is_physical = False
         else:
             # Auto-detection mode: prevent mixed units in the same request
-            if is_physical_like_size and (is_uci_like_weight or self.Whole_weight <= 3.0):
-                raise ValueError(
-                    "Phát hiện dữ liệu không nhất quán về hệ đơn vị (kích thước dùng mm vật lý nhưng khối lượng dùng thang UCI). "
-                    "Vui lòng cung cấp toàn bộ giá trị theo mm/g hoặc toàn bộ theo thang UCI."
-                )
-            if is_uci_like_size and is_physical_like_weight:
+            if is_uci_like_size and is_uci_like_weight:
+                is_physical = False
+            elif is_physical_like_size:
+                if self.Length >= 40.0 and self.Whole_weight <= 4.0:
+                    raise ValueError(
+                        "Phát hiện dữ liệu không nhất quán về hệ đơn vị (kích thước dùng mm vật lý nhưng khối lượng dùng thang UCI). "
+                        "Vui lòng cung cấp toàn bộ giá trị theo mm/g hoặc toàn bộ theo thang UCI."
+                    )
+                if self.Whole_weight < 0.1:
+                    raise ValueError(
+                        "Phát hiện dữ liệu không nhất quán: Tổng khối lượng < 0.1g không tương xứng với kích thước mm."
+                    )
+                is_physical = True
+            elif is_uci_like_size and any(w > 5.0 for w in weights):
                 raise ValueError(
                     "Phát hiện dữ liệu không nhất quán về hệ đơn vị (kích thước dùng thang UCI nhưng khối lượng dùng gam vật lý). "
                     "Vui lòng cung cấp toàn bộ giá trị theo mm/g hoặc toàn bộ theo thang UCI."
                 )
-            if is_physical_like_size and is_physical_like_weight:
-                is_physical = True
-            elif is_uci_like_size and is_uci_like_weight:
-                is_physical = False
             else:
                 raise ValueError(
                     "Không thể tự động xác định hệ đơn vị do các giá trị đo lường nằm ngoài miền chuẩn. "

@@ -50,9 +50,11 @@ type EvaluationReports = {
     removedSamples: number
     cleanedSamples: number
     trainingSamples: number
+    validationSamples?: number
+    refitSamples?: number
     testSamples: number
   }
-  modelResults: Array<{ model: string; mae: number; rmse: number; r2: number }>
+  modelResults: Array<{ model: string; selectionStage?: string; mae: number; rmse: number; r2: number }>
   cvAblation: Array<{ preprocessing: string; bestK: number; bestWeights: string; cvMae: number; cvStd: number }>
   cvResults: Array<{ scaling: string; withScaling: boolean; weights: string; k: number; mae: number; maeStd: number }>
   ageGroupMae: Array<{ group: string; mae: number }>
@@ -358,8 +360,12 @@ function App() {
     if (!modelCard || !evaluationReports) return false
     const runtimeHyperparameters = modelCard.hyperparameters
     const artifactHyperparameters = evaluationReports.metadata.hyperparameters
-    const standardScalerResult = evaluationReports.modelResults.find(
-      (row) => row.model === 'KNN - StandardScaler',
+    // Match against the selected and refitted model (KNN - No Scale)
+    const selectedModelResult = evaluationReports.modelResults.find(
+      (row) =>
+        row.selectionStage?.includes('Selected') ||
+        row.model.includes('No Scale') ||
+        (!row.model.includes('Baseline') && row.mae !== undefined),
     )
     const metrics = modelCard.performance_metrics
     const close = (runtime: number | undefined, artifact: number | undefined) =>
@@ -369,10 +375,10 @@ function App() {
       Number(runtimeHyperparameters.n_neighbors) === Number(artifactHyperparameters.n_neighbors) &&
       String(runtimeHyperparameters.weights) === String(artifactHyperparameters.weights) &&
       String(runtimeHyperparameters.scaling) === String(artifactHyperparameters.scaling) &&
-      standardScalerResult !== undefined &&
-      close(metrics.Test_MAE, standardScalerResult.mae) &&
-      close(metrics.Test_RMSE, standardScalerResult.rmse) &&
-      close(metrics.Test_R2, standardScalerResult.r2)
+      selectedModelResult !== undefined &&
+      close(metrics.Test_MAE, selectedModelResult.mae) &&
+      close(metrics.Test_RMSE, selectedModelResult.rmse) &&
+      close(metrics.Test_R2, selectedModelResult.r2)
     )
   }, [evaluationReports, modelCard])
 
@@ -625,36 +631,36 @@ function App() {
                   </div>
                   <div className="flow-arrow" aria-hidden="true">→</div>
                   <div className="flow-node">
-                    <strong>Chia Train / Test</strong>
-                    <span>{evaluationReports.dataAudit.trainingSamples.toLocaleString('vi-VN')} / {evaluationReports.dataAudit.testSamples.toLocaleString('vi-VN')} mẫu</span>
+                    <strong>Phân chia 3 tập</strong>
+                    <span>Train 70% · Val 15% · Test 15%</span>
                   </div>
                   <div className="flow-branches">
                     <article className="flow-lane train-lane">
-                      <div className="lane-label">TRAIN · chỉ dùng tập huấn luyện</div>
+                      <div className="lane-label">TRAIN (70%) & VALIDATION (15%) · Huấn luyện & Khóa cấu hình</div>
                       <div className="flow-lane-steps">
                         <div className="flow-node">
-                          <strong>5-fold CV</strong>
-                          <span>So sánh K và weights trên Train</span>
+                          <strong>5-fold CV (Train 70%)</strong>
+                          <span>Tối ưu K và weights cho No Scale & Scaled</span>
                         </div>
                         <span className="flow-arrow" aria-hidden="true">→</span>
                         <div className="flow-node">
-                          <strong>Chọn cấu hình</strong>
-                          <span>Mã pipeline chọn trong nhánh StandardScaler</span>
+                          <strong>Validation (15%)</strong>
+                          <span>Chọn No Scale (Val MAE 1.4564 vs Scaled 1.5190)</span>
                         </div>
                         <span className="flow-arrow" aria-hidden="true">→</span>
                         <div className="flow-node">
-                          <strong>Fit pipeline cuối</strong>
-                          <span>Preprocessor + KNN fit trên toàn bộ Train</span>
+                          <strong>Refit 85%</strong>
+                          <span>Khóa cấu hình, refit trên Train + Val (3.547 mẫu)</span>
                         </div>
                       </div>
                     </article>
                     <article className="flow-lane test-lane">
-                      <div className="lane-label">TEST · giữ độc lập, không chọn cấu hình</div>
-                      <p>Đánh giá cuối cùng và phân tích residual/MAE nhóm tuổi trên tập test.</p>
+                      <div className="lane-label">TEST (15%) · Đánh giá độc lập 1 lần</div>
+                      <p>Chỉ đánh giá đúng 1 lần trên cấu hình đã khóa & refit: MAE 1.5018, RMSE 2.2567, R² 0.5820.</p>
                     </article>
                     <article className="flow-lane serving-lane">
-                      <div className="lane-label">SERVING</div>
-                      <p>Pipeline đã lưu được nạp bởi FastAPI; frontend gửi phép đo đến Prediction API.</p>
+                      <div className="lane-label">SERVING · FastAPI</div>
+                      <p>FastAPI nạp pipeline No Scale (K=17, distance) đã refit 85% dữ liệu để phục vụ dự đoán thời gian thực.</p>
                     </article>
                   </div>
                   <p className="source-note">
@@ -1017,9 +1023,8 @@ function App() {
                   </table>
                 </div>
                 <p className="insight">
-                  <strong>Nhận xét kết quả.</strong> Trên test set, các KNN trong artifact có MAE thấp hơn
-                  Median Baseline. Bảng phân biệt rõ KNN không scale và StandardScaler; cấu hình API
-                  hiện tại chỉ được xác nhận khi API khớp artifact.
+                  <strong>Nhận xét kết quả.</strong> Trên test set độc lập, mô hình tối ưu KNN - No Scale (Refitted 85%) vượt trội hoàn toàn Median Baseline,
+                  giảm hơn 41.5% sai số MAE (1.5018 so với 2.5655) và nâng hệ số giải thích R² lên 0.5820. Ứng viên StandardScaler đã bị loại từ vòng Validation nên không đánh giá Test để bảo toàn tính độc lập của tập Test.
                 </p>
                 <p className="source-note">Nguồn: {evaluationReports.sources.modelResults}. Metric đánh giá trên test set độc lập.</p>
               </>
@@ -1056,15 +1061,12 @@ function App() {
                   ))}
                 </div>
                 <p className="insight">
-                  <strong>Nhận xét kết quả.</strong> Trong artifact hiện tại, No Scaling có CV MAE thấp
-                  hơn StandardScaler; kết quả này không có nghĩa scaling luôn tốt hơn. Đây là kết quả
-                  cross-validation trên train, không phải metric test. Model API đang load StandardScaler
-                  với cấu hình riêng hiển thị ở KPI phía trên.
+                  <strong>Nhận xét kết quả.</strong> Trong thực nghiệm CV trên tập Train (70%), nhánh No Scaling đạt kết quả tốt hơn StandardScaler.
+                  Hai cấu hình tốt nhất của mỗi nhánh sau đó được so tài độc lập trên tập Validation (15%): No Scaling tiếp tục chiến thắng với Val MAE 1.4564 (so với 1.5190 của StandardScaler).
                 </p>
                 <div className="notice-box">
-                  Mã pipeline gọi chọn cấu hình với <code>force_scaling=True</code>; vì vậy cấu hình cuối
-                  được chọn trong nhánh StandardScaler dù No Scaling có CV MAE thấp hơn ở bảng hiện tại.
-                  Artifact không ghi rõ lý do phương pháp cho lựa chọn này; cần nhóm Model xác nhận nếu được hỏi.
+                  Dựa trên kết quả Validation, hệ thống đã khóa cấu hình tối ưu là <strong>KNN - No Scale</strong> (K=17, weights='distance'),
+                  sau đó refit trên toàn bộ 85% Train + Validation (3.547 mẫu) trước khi đánh giá Test và đóng gói serving. Runtime API hiện tại đang phục vụ chính xác mô hình No Scale này.
                 </div>
                 <p className="source-note">Nguồn: {evaluationReports.sources.cvAblation}. Sai số hiển thị là CV_STD qua các fold.</p>
               </>

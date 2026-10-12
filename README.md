@@ -76,7 +76,7 @@ venv\Scripts\Activate.ps1
 
 > *Lưu ý nếu PowerShell báo lỗi Execution Policy:* Chạy lệnh `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` rồi kích hoạt lại.
 
-### Bước 3: Cài đặt các thư viện phụ thuộc
+### Bước 3: Cài đặt các thư viện phụ thuộc Python
 
 ```powershell
 pip install -r requirements.txt
@@ -84,17 +84,30 @@ pip install -r requirements.txt
 
 *Các thư viện lõi:* `scikit-learn==1.9.1`, `pandas>=2.2.0`, `numpy>=1.26.0`, `joblib>=1.4.0`, `matplotlib>=3.8.0`, `fastapi>=0.110.0`, `uvicorn>=0.28.0`, `pydantic>=2.6.0`, `httpx>=0.27.0`.
 
+### Bước 4: Biên dịch Giao diện Web Frontend (Bắt buộc cho repo mới clone)
+
+Do thư mục bản dựng `frontend/dist` không đưa lên Git để giữ repository tinh gọn, hãy thực hiện biên dịch frontend trước khi khởi động fullstack server:
+
+```powershell
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+> **Lưu ý:** Lệnh `npm run build` sẽ tự động kích hoạt hook `prebuild` (`node scripts/prepare-model-reports.mjs`) để đồng bộ toàn bộ bảng kết quả và artifact mới nhất vào giao diện. Nếu khởi động server khi chưa build, backend vẫn chạy và hiển thị trang hướng dẫn cài đặt trực quan tại `http://127.0.0.1:8000/`.
+
 ---
 
 ## 🚀 Hướng dẫn Chạy dự án
 
 ### Cách 1: Khởi động Fullstack 1-Click (Khuyên dùng khi Báo cáo / Chấm thi)
 
-Chỉ cần chạy một lệnh duy nhất:
+Sau khi đã build frontend ở Bước 4, chỉ cần chạy một lệnh duy nhất:
 ```powershell
 python run_server.py
 ```
-Hệ thống sẽ tự động khởi tạo backend FastAPI và phục vụ giao diện Web React đã biên dịch:
+Hệ thống sẽ tự động khởi tạo backend FastAPI và phục vụ giao diện Web React:
 * **Giao diện Web ứng dụng (Frontend):** [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
   * **Tab 1: Giới thiệu & Phạm vi** (Mục tiêu sinh học, quy chuẩn bài toán, bản quyền dữ liệu).
   * **Tab 2: Dự đoán & Láng giềng** (Form nhập liệu 2 hệ đơn vị, bảng láng giềng gần nhất, khoảng tham chiếu từ K láng giềng & cảnh báo OOD).
