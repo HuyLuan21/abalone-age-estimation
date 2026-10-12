@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "predev": "node scripts/prepare-model-reports.mjs",
+    "prebuild": "node scripts/prepare-model-reports.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

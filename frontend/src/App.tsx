@@ -8,6 +8,7 @@ import {
   Gauge,
   Layers3,
   LoaderCircle,
+  Scale,
   ShieldAlert,
   Sparkles,
   Target,
@@ -17,7 +18,10 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
+  ErrorBar,
+  Line,
+  LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -37,6 +41,37 @@ type ModelCard = {
   age_group_mae: Record<string, number>
   limitations: string[]
   feature_statistics: Record<string, { desc: string; unit: string; min: number; max: number; mean: number; std: number }>
+}
+
+type EvaluationReports = {
+  sources: Record<string, string>
+  dataAudit: {
+    rawSamples: number
+    removedSamples: number
+    cleanedSamples: number
+    trainingSamples: number
+    testSamples: number
+  }
+  modelResults: Array<{ model: string; mae: number; rmse: number; r2: number }>
+  cvAblation: Array<{ preprocessing: string; bestK: number; bestWeights: string; cvMae: number; cvStd: number }>
+  cvResults: Array<{ scaling: string; withScaling: boolean; weights: string; k: number; mae: number; maeStd: number }>
+  ageGroupMae: Array<{ group: string; mae: number }>
+  metadata: {
+    totalTrainingSamples: number
+    totalTestSamples: number
+    hyperparameters: Record<string, string | number>
+    pipelineSteps: string[]
+    intendedUse: string
+    limitations: string[]
+    datasetSource: string
+    featureStatistics: Record<string, {
+      description: string
+      min: number
+      max: number
+      mean: number
+      physicalUnit: string
+    }>
+  }
 }
 
 type FeatureRangeItem = {
@@ -82,14 +117,17 @@ type PredictionResponse = {
 
 type FormState = {
   Sex: 'M' | 'F' | 'I'
-  Length: number
-  Diameter: number
-  Height: number
-  Whole_weight: number
-  Shucked_weight: number
-  Viscera_weight: number
-  Shell_weight: number
+  Length: string
+  Diameter: string
+  Height: string
+  Whole_weight: string
+  Shucked_weight: string
+  Viscera_weight: string
+  Shell_weight: string
 }
+
+type MeasurementField = Exclude<keyof FormState, 'Sex'>
+type InputScale = 'uci' | 'physical'
 
 type MetricCardProps = {
   label: string
@@ -101,13 +139,13 @@ type MetricCardProps = {
 
 const defaultForm: FormState = {
   Sex: 'M',
-  Length: 0.455,
-  Diameter: 0.365,
-  Height: 0.095,
-  Whole_weight: 0.514,
-  Shucked_weight: 0.2245,
-  Viscera_weight: 0.101,
-  Shell_weight: 0.15,
+  Length: '0.455',
+  Diameter: '0.365',
+  Height: '0.095',
+  Whole_weight: '0.514',
+  Shucked_weight: '0.2245',
+  Viscera_weight: '0.101',
+  Shell_weight: '0.15',
 }
 
 const API_BASE = '/api'
@@ -116,31 +154,97 @@ const samplePresets: Record<'standard' | 'physical' | 'ood', FormState> = {
   standard: { ...defaultForm },
   physical: {
     Sex: 'M',
-    Length: 91,
-    Diameter: 73,
-    Height: 19,
-    Whole_weight: 102.8,
-    Shucked_weight: 44.9,
-    Viscera_weight: 20.2,
-    Shell_weight: 30,
+    Length: '91',
+    Diameter: '73',
+    Height: '19',
+    Whole_weight: '102.8',
+    Shucked_weight: '44.9',
+    Viscera_weight: '20.2',
+    Shell_weight: '30',
   },
   ood: {
     Sex: 'F',
-    Length: 0.95,
-    Diameter: 0.75,
-    Height: 0.35,
-    Whole_weight: 3.5,
-    Shucked_weight: 1.6,
-    Viscera_weight: 0.85,
-    Shell_weight: 1.1,
+    Length: '0.95',
+    Diameter: '0.75',
+    Height: '0.35',
+    Whole_weight: '3.5',
+    Shucked_weight: '1.6',
+    Viscera_weight: '0.85',
+    Shell_weight: '1.1',
   },
 }
 
-const metricColors = ['#1f7ae0', '#25c6d7', '#12a561']
+const measurementFields: Array<{
+  key: MeasurementField
+  label: string
+  physicalUnit: 'mm' | 'g'
+}> = [
+  { key: 'Length', label: 'Length · Chiều dài vỏ', physicalUnit: 'mm' },
+  { key: 'Diameter', label: 'Diameter · Đường kính vỏ', physicalUnit: 'mm' },
+  { key: 'Height', label: 'Height · Chiều cao vỏ', physicalUnit: 'mm' },
+  { key: 'Whole_weight', label: 'Whole weight · Khối lượng toàn bộ', physicalUnit: 'g' },
+  { key: 'Shucked_weight', label: 'Shucked weight · Khối lượng thịt', physicalUnit: 'g' },
+  { key: 'Viscera_weight', label: 'Viscera weight · Khối lượng nội tạng', physicalUnit: 'g' },
+  { key: 'Shell_weight', label: 'Shell weight · Khối lượng vỏ khô', physicalUnit: 'g' },
+]
+
+const featureDescriptions: Record<string, string> = {
+  Sex: 'Giới tính: M (đực), F (cái), I (non/chưa phân hóa).',
+  Length: 'Chiều dài lớn nhất của vỏ, song song trục dài.',
+  Diameter: 'Đường kính lớn nhất vuông góc với chiều dài.',
+  Height: 'Chiều cao thẳng đứng gồm phần thịt bên trong vỏ.',
+  Whole_weight: 'Khối lượng nguyên con: vỏ, thịt và nội tạng.',
+  Shucked_weight: 'Khối lượng phần thịt sau khi tách vỏ.',
+  Viscera_weight: 'Khối lượng nội tạng sau khi mổ.',
+  Shell_weight: 'Khối lượng vỏ sau khi rửa và sấy khô.',
+}
+
+const safeLimitations = [
+  'Tuổi được ước lượng từ Rings + 1.5 năm theo quy ước dữ liệu; đây không phải phép đo tuổi sinh học trực tiếp.',
+  'Bảng phân tích MAE theo nhóm tuổi không kèm số mẫu mỗi nhóm; không thể kết luận nguyên nhân chênh lệch sai số từ artifact này.',
+  'Metric mô tả tập test của thí nghiệm hiện có; không bảo đảm hiệu năng tương tự trên dữ liệu ngoài miền.',
+]
+
+const cvLineColors = {
+  scaled_uniform: '#1f7ae0',
+  scaled_distance: '#12a561',
+  unscaled_uniform: '#7b61c9',
+  unscaled_distance: '#e59a27',
+}
 
 const formatNumber = (value: number | undefined, digits = 3) => {
   if (value === undefined || Number.isNaN(value)) return '—'
   return Number(value).toFixed(digits)
+}
+
+function formatApiError(detail: unknown): string {
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    return detail
+      .map((issue) => {
+        if (typeof issue === 'string') return issue
+        if (issue && typeof issue === 'object' && 'msg' in issue) {
+          const location = 'loc' in issue && Array.isArray(issue.loc)
+            ? issue.loc.filter((part: unknown) => part !== 'body').join(' → ')
+            : ''
+          return `${location ? `${location}: ` : ''}${String(issue.msg)}`
+        }
+        return JSON.stringify(issue)
+      })
+      .join('; ')
+  }
+  return 'Không thể thực hiện yêu cầu với dữ liệu hiện tại.'
+}
+
+function formatOodWarning(warning: string): { message: string; usesNormalizedValues: boolean } {
+  const message = warning
+    .replace(/(\d)\s*(?:mm|g)\b/gi, '$1')
+    .replace(/\s+\./g, '.')
+
+  return {
+    message,
+    usesNormalizedValues: message !== warning,
+  }
 }
 
 function MetricCard({ label, value, hint, icon, tone = 'neutral' }: MetricCardProps) {
@@ -160,11 +264,17 @@ function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const [modelCard, setModelCard] = useState<ModelCard | null>(null)
   const [featureRanges, setFeatureRanges] = useState<FeatureRanges | null>(null)
+  const [evaluationReports, setEvaluationReports] = useState<EvaluationReports | null>(null)
   const [form, setForm] = useState<FormState>(defaultForm)
+  const [inputScale, setInputScale] = useState<InputScale>('uci')
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null)
+  const [showAllNeighbors, setShowAllNeighbors] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [reportsLoading, setReportsLoading] = useState(true)
+  const [apiAvailable, setApiAvailable] = useState<boolean | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reportsError, setReportsError] = useState<string | null>(null)
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -185,43 +295,146 @@ function App() {
         setModelCard(modelData)
         setFeatureRanges(featureData)
         setError(null)
+        setApiAvailable(true)
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Lỗi không xác định khi tải dữ liệu.')
+        setError(
+          loadError instanceof TypeError
+            ? 'Không thể kết nối backend API. Hãy khởi động FastAPI để xem metric và cấu hình runtime.'
+            : loadError instanceof Error
+              ? loadError.message
+              : 'Lỗi không xác định khi tải dữ liệu.',
+        )
+        setApiAvailable(false)
       } finally {
         setLoading(false)
       }
     }
 
+    const loadReports = async () => {
+      try {
+        const response = await fetch('/model-reports/evaluation.json')
+        if (!response.ok) {
+          throw new Error(`Không thể tải báo cáo tĩnh (${response.status}). Chạy lại npm run predev để tái tạo dữ liệu.`)
+        }
+        setEvaluationReports((await response.json()) as EvaluationReports)
+      } catch (loadError) {
+        setReportsError(loadError instanceof Error ? loadError.message : 'Không thể tải artifact thực nghiệm.')
+      } finally {
+        setReportsLoading(false)
+      }
+    }
+
     void loadDashboard()
+    void loadReports()
   }, [])
 
-  const metricsChartData = useMemo(() => {
-    if (!modelCard) return []
+  const cvChartData = useMemo(() => {
+    if (!evaluationReports) return []
+    const grouped = new Map<number, Record<string, number | null>>()
 
-    return [
-      { name: 'MAE', value: modelCard.performance_metrics.Test_MAE ?? 0 },
-      { name: 'RMSE', value: modelCard.performance_metrics.Test_RMSE ?? 0 },
-      { name: 'R²', value: modelCard.performance_metrics.Test_R2 ?? 0 },
-    ]
-  }, [modelCard])
+    evaluationReports.cvResults.forEach((row) => {
+      const point = grouped.get(row.k) ?? { k: row.k }
+      const series = `${row.withScaling ? 'scaled' : 'unscaled'}_${row.weights}`
+      point[series] = row.mae
+      grouped.set(row.k, point)
+    })
 
-  const ageGroupChartData = useMemo(() => {
-    if (!modelCard) return []
+    return [...grouped.values()].sort((first, second) => Number(first.k) - Number(second.k))
+  }, [evaluationReports])
 
-    return Object.entries(modelCard.age_group_mae).map(([name, value]) => ({
-      name,
-      value,
-    }))
-  }, [modelCard])
+  const selectedCvResult = useMemo(() => {
+    if (!evaluationReports) return null
+    const hyperparameters = modelCard?.hyperparameters ?? evaluationReports.metadata.hyperparameters
+    const usesScaling = String(hyperparameters.scaling ?? '').toLowerCase().includes('scaler')
+    return evaluationReports.cvResults.find(
+      (row) =>
+        row.k === Number(hyperparameters.n_neighbors) &&
+        row.weights === String(hyperparameters.weights) &&
+        row.withScaling === usesScaling,
+    ) ?? null
+  }, [evaluationReports, modelCard])
+
+  const apiMatchesReport = useMemo(() => {
+    if (!modelCard || !evaluationReports) return false
+    const runtimeHyperparameters = modelCard.hyperparameters
+    const artifactHyperparameters = evaluationReports.metadata.hyperparameters
+    const standardScalerResult = evaluationReports.modelResults.find(
+      (row) => row.model === 'KNN - StandardScaler',
+    )
+    const metrics = modelCard.performance_metrics
+    const close = (runtime: number | undefined, artifact: number | undefined) =>
+      runtime !== undefined && artifact !== undefined && Math.abs(runtime - artifact) < 0.00011
+
+    return (
+      Number(runtimeHyperparameters.n_neighbors) === Number(artifactHyperparameters.n_neighbors) &&
+      String(runtimeHyperparameters.weights) === String(artifactHyperparameters.weights) &&
+      String(runtimeHyperparameters.scaling) === String(artifactHyperparameters.scaling) &&
+      standardScalerResult !== undefined &&
+      close(metrics.Test_MAE, standardScalerResult.mae) &&
+      close(metrics.Test_RMSE, standardScalerResult.rmse) &&
+      close(metrics.Test_R2, standardScalerResult.r2)
+    )
+  }, [evaluationReports, modelCard])
 
   const featureEntries = useMemo(
-    () => (featureRanges ? Object.entries(featureRanges.numeric_ranges) : []),
-    [featureRanges],
+    () => {
+      if (featureRanges) return Object.entries(featureRanges.numeric_ranges)
+      if (!evaluationReports) return []
+      return Object.entries(evaluationReports.metadata.featureStatistics).map(([feature, stats]) => [
+        feature,
+        {
+          unit: stats.physicalUnit,
+          description: stats.description,
+          min: stats.min / 200,
+          max: stats.max / 200,
+          mean: stats.mean / 200,
+          std: 0,
+          physical_unit: stats.physicalUnit,
+          physical_min: stats.min,
+          physical_max: stats.max,
+          physical_mean: stats.mean,
+        },
+      ] as [string, FeatureRangeItem])
+    },
+    [evaluationReports, featureRanges],
   )
 
+  const getObservedRange = (feature: MeasurementField) => {
+    const apiRange = featureRanges?.numeric_ranges[feature]
+    if (apiRange) {
+      return {
+        min: apiRange.physical_min,
+        max: apiRange.physical_max,
+        unit: apiRange.physical_unit,
+      }
+    }
+
+    const reportRange = evaluationReports?.metadata.featureStatistics[feature]
+    return reportRange
+      ? { min: reportRange.min, max: reportRange.max, unit: reportRange.physicalUnit }
+      : null
+  }
+
   const handleFieldChange = (field: keyof FormState, rawValue: string) => {
-    const nextValue = field === 'Sex' ? (rawValue as FormState['Sex']) : Number(rawValue)
-    setForm((previous) => ({ ...previous, [field]: nextValue }))
+    setForm((previous) => ({ ...previous, [field]: rawValue }))
+  }
+
+  const changeInputScale = (nextScale: InputScale) => {
+    if (nextScale === inputScale) return
+    setForm((previous) => {
+      const converted = { ...previous }
+      measurementFields.forEach(({ key }) => {
+        const current = previous[key]
+        const numeric = Number(current)
+        if (current.trim() && Number.isFinite(numeric)) {
+          converted[key] = String(Number((numeric * (nextScale === 'physical' ? 200 : 1 / 200)).toPrecision(12)))
+        }
+      })
+      return converted
+    })
+    setInputScale(nextScale)
+    setError(null)
+    setPrediction(null)
   }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -230,10 +443,24 @@ function App() {
     setError(null)
 
     try {
+      const numericValues: Partial<Record<MeasurementField, number>> = {}
+      for (const { key, label } of measurementFields) {
+        const rawValue = form[key].trim()
+        if (!rawValue) throw new Error(`${label}: vui lòng nhập giá trị.`)
+        const value = Number(rawValue)
+        if (!Number.isFinite(value)) throw new Error(`${label}: cần nhập một số hợp lệ.`)
+        if (value <= 0) throw new Error(`${label}: giá trị phải lớn hơn 0.`)
+        numericValues[key] = inputScale === 'physical' ? Number((value / 200).toPrecision(12)) : value
+      }
+
+      const payload = {
+        Sex: form.Sex,
+        ...numericValues,
+      }
       const response = await fetch(`${API_BASE}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
@@ -258,6 +485,7 @@ function App() {
 
       const result = (await response.json()) as PredictionResponse
       setPrediction(result)
+      setShowAllNeighbors(false)
       setActiveView('predict')
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Lỗi khi thực hiện dự đoán.')
@@ -268,7 +496,18 @@ function App() {
 
   const loadPreset = (key: 'standard' | 'physical' | 'ood') => {
     setForm(samplePresets[key])
+    setInputScale(key === 'physical' ? 'physical' : 'uci')
     setPrediction(null)
+    setShowAllNeighbors(false)
+    setError(null)
+  }
+
+  const resetPrediction = () => {
+    setForm(defaultForm)
+    setInputScale('uci')
+    setPrediction(null)
+    setShowAllNeighbors(false)
+    setError(null)
   }
 
   return (
@@ -301,9 +540,9 @@ function App() {
           ))}
         </nav>
 
-        <div className="status-pill">
+        <div className={`status-pill ${apiAvailable === false && !loading ? 'offline' : ''}`}>
           <span className="pulse" />
-          {loading ? 'Đang đồng bộ' : 'API sẵn sàng'}
+          {loading ? 'Đang đồng bộ' : apiAvailable ? 'API sẵn sàng' : 'API ngoại tuyến'}
         </div>
       </header>
 
@@ -344,15 +583,15 @@ function App() {
           <section className="metrics-grid">
             <MetricCard
               label="Dataset"
-              value={featureRanges ? 'Abalone' : 'Đang tải'}
-              hint="Nguồn: UCI ML Repository"
+              value={evaluationReports ? evaluationReports.dataAudit.rawSamples.toLocaleString('vi-VN') : '—'}
+              hint="Mẫu raw · UCI Abalone"
               icon={<Database size={18} />}
               tone="primary"
             />
             <MetricCard
-              label="Mẫu đào tạo"
-              value={featureRanges ? featureRanges.total_training_samples.toLocaleString('vi-VN') : '—'}
-              hint="80% dữ liệu huấn luyện"
+              label="Train / Test"
+              value={evaluationReports ? `${evaluationReports.dataAudit.trainingSamples.toLocaleString('vi-VN')} / ${evaluationReports.dataAudit.testSamples.toLocaleString('vi-VN')}` : '—'}
+              hint={evaluationReports ? `${evaluationReports.dataAudit.cleanedSamples.toLocaleString('vi-VN')} mẫu sau audit · ${evaluationReports.dataAudit.removedSamples} dòng loại` : 'Số lượng theo metadata'}
               icon={<Layers3 size={18} />}
               tone="success"
             />
@@ -365,7 +604,7 @@ function App() {
             <MetricCard
               label="MAE test"
               value={modelCard ? formatNumber(modelCard.performance_metrics.Test_MAE, 3) : '—'}
-              hint="Sai số tuyệt đối trung bình"
+              hint="Rings · sai số tuyệt đối trung bình"
               icon={<Gauge size={18} />}
             />
           </section>
@@ -386,22 +625,60 @@ function App() {
             <article className="panel section-card">
               <div className="section-header">
                 <Sparkles size={18} />
-                <h2>Pipeline</h2>
+                <h2>Quy trình dữ liệu và đánh giá</h2>
               </div>
-              <ol className="pipeline-list">
-                {[
-                  'Abalone Dataset',
-                  'Data Preparation',
-                  'Train/Test Split',
-                  'Preprocessing Pipeline',
-                  'Cross-validation',
-                  'KNN Regression',
-                  'Evaluation',
-                  'Prediction API',
-                ].map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
+              {evaluationReports ? (
+                <div className="pipeline-diagram" aria-label="Luồng dữ liệu, train, cross-validation, test và serving">
+                  <div className="flow-node source-node">
+                    <strong>UCI raw</strong>
+                    <span>{evaluationReports.dataAudit.rawSamples.toLocaleString('vi-VN')} dòng</span>
+                  </div>
+                  <div className="flow-arrow" aria-hidden="true">→</div>
+                  <div className="flow-node">
+                    <strong>Làm sạch</strong>
+                    <span>Loại {evaluationReports.dataAudit.removedSamples} dòng theo anomaly audit</span>
+                  </div>
+                  <div className="flow-arrow" aria-hidden="true">→</div>
+                  <div className="flow-node">
+                    <strong>Chia Train / Test</strong>
+                    <span>{evaluationReports.dataAudit.trainingSamples.toLocaleString('vi-VN')} / {evaluationReports.dataAudit.testSamples.toLocaleString('vi-VN')} mẫu</span>
+                  </div>
+                  <div className="flow-branches">
+                    <article className="flow-lane train-lane">
+                      <div className="lane-label">TRAIN · chỉ dùng tập huấn luyện</div>
+                      <div className="flow-lane-steps">
+                        <div className="flow-node">
+                          <strong>5-fold CV</strong>
+                          <span>So sánh K và weights trên Train</span>
+                        </div>
+                        <span className="flow-arrow" aria-hidden="true">→</span>
+                        <div className="flow-node">
+                          <strong>Chọn cấu hình</strong>
+                          <span>Mã pipeline chọn trong nhánh StandardScaler</span>
+                        </div>
+                        <span className="flow-arrow" aria-hidden="true">→</span>
+                        <div className="flow-node">
+                          <strong>Fit pipeline cuối</strong>
+                          <span>Preprocessor + KNN fit trên toàn bộ Train</span>
+                        </div>
+                      </div>
+                    </article>
+                    <article className="flow-lane test-lane">
+                      <div className="lane-label">TEST · giữ độc lập, không chọn cấu hình</div>
+                      <p>Đánh giá cuối cùng và phân tích residual/MAE nhóm tuổi trên tập test.</p>
+                    </article>
+                    <article className="flow-lane serving-lane">
+                      <div className="lane-label">SERVING</div>
+                      <p>Pipeline đã lưu được nạp bởi FastAPI; frontend gửi phép đo đến Prediction API.</p>
+                    </article>
+                  </div>
+                  <p className="source-note">
+                    Nguồn số lượng: {evaluationReports.sources.rawDataset}, {evaluationReports.sources.removedAnomalies} và {evaluationReports.sources.metadata}.
+                  </p>
+                </div>
+              ) : (
+                <div className="empty-state">Đang tải dữ liệu đối chiếu pipeline…</div>
+              )}
             </article>
           </section>
 
@@ -413,13 +690,22 @@ function App() {
 
             <div className="feature-grid">
               {featureEntries.length > 0 ? (
-                featureEntries.map(([feature, stats]) => (
+                [
+                  ['Sex', null] as const,
+                  ...featureEntries.map(([feature, stats]) => [feature, stats] as const),
+                ].map(([feature, stats]) => (
                   <div key={feature} className="feature-card">
                     <div className="feature-name">{feature}</div>
-                    <div className="feature-meta">{stats.description}</div>
-                    <div className="feature-range">
-                      {stats.min}–{stats.max} {stats.unit}
-                    </div>
+                    <div className="feature-meta">{featureDescriptions[feature]}</div>
+                    {stats ? (
+                      <div className="feature-range">
+                        Quan sát Train: {formatNumber(stats.physical_min, 2)}–{formatNumber(stats.physical_max, 2)} {stats.physical_unit}
+                      </div>
+                    ) : (
+                      <div className="feature-range">
+                        Giá trị: {featureRanges?.valid_sex_values.join(' · ') ?? 'M · F · I'}
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -439,62 +725,99 @@ function App() {
             </div>
 
             <div className="preset-row">
-              {Object.entries(samplePresets).map(([key]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className="preset-button"
-                  onClick={() => loadPreset(key as 'standard' | 'physical' | 'ood')}
-                >
-                  {key === 'standard' ? 'Mẫu chuẩn' : key === 'physical' ? 'Mẫu vật lý' : 'Mẫu OOD'}
-                </button>
-              ))}
+              <button type="button" className="preset-button" onClick={() => loadPreset('standard')}>
+                Ví dụ hợp lệ · thang UCI
+              </button>
+              <button type="button" className="preset-button" onClick={() => loadPreset('physical')}>
+                Ví dụ vật lý · mm/g
+              </button>
+              <button type="button" className="preset-button" onClick={() => loadPreset('ood')}>
+                Ví dụ ngoài miền · thang UCI
+              </button>
             </div>
+            <p className="preset-help">
+              Các nút chỉ nạp ví dụ đã kiểm thử/có trong API schema; hãy nhấn “Dự đoán tuổi” để gửi mẫu.
+              Ví dụ ngoài miền vẫn hợp lệ về schema nhưng vượt miền quan sát của một số đặc trưng.
+            </p>
 
             <form className="prediction-form" onSubmit={handleSubmit}>
+              <fieldset className="unit-selector">
+                <legend>Đơn vị nhập cho 7 phép đo liên tục</legend>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="input-scale"
+                    checked={inputScale === 'uci'}
+                    onChange={() => changeInputScale('uci')}
+                  />
+                  Thang dữ liệu UCI (đã chia 200)
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="input-scale"
+                    checked={inputScale === 'physical'}
+                    onChange={() => changeInputScale('physical')}
+                  />
+                  Đơn vị vật lý (mm / g)
+                </label>
+                <p>
+                  {inputScale === 'physical'
+                    ? 'Frontend tự chia từng giá trị cho 200 trước khi gửi API.'
+                    : 'Giá trị nhập được gửi nguyên trạng theo thang UCI.'}
+                  {' '}Dùng dấu chấm cho phần thập phân.
+                </p>
+              </fieldset>
               <div className="form-row">
                 <label>
-                  <span>Giới tính</span>
+                  <span>Sex · Giới tính</span>
                   <select value={form.Sex} onChange={(event) => handleFieldChange('Sex', event.target.value)}>
-                    <option value="M">M</option>
-                    <option value="F">F</option>
-                    <option value="I">I</option>
+                    <option value="M">M · Đực</option>
+                    <option value="F">F · Cái</option>
+                    <option value="I">I · Non / chưa phân hóa</option>
                   </select>
                 </label>
               </div>
 
               <div className="form-grid">
-                {[
-                  ['Length', 'Length'],
-                  ['Diameter', 'Diameter'],
-                  ['Height', 'Height'],
-                  ['Whole_weight', 'Whole weight'],
-                  ['Shucked_weight', 'Shucked weight'],
-                  ['Viscera_weight', 'Viscera weight'],
-                  ['Shell_weight', 'Shell weight'],
-                ].map(([field, label]) => (
-                  <label key={field}>
-                    <span>{label}</span>
+                {measurementFields.map(({ key, label, physicalUnit }) => {
+                  const observedRange = getObservedRange(key)
+                  return (
+                  <label key={key} className="measurement-label">
+                    <span>{label} <em>({inputScale === 'physical' ? physicalUnit : 'thang UCI'})</em></span>
                     <input
-                      type="number"
-                      step="0.0001"
-                      value={form[field as keyof FormState]}
-                      onChange={(event) => handleFieldChange(field as keyof FormState, event.target.value)}
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={form[key]}
+                      aria-describedby={`${key}-measurement-help`}
+                      onChange={(event) => handleFieldChange(key, event.target.value)}
                     />
+                    <small id={`${key}-measurement-help`}>
+                      {observedRange
+                        ? `Train quan sát: ${formatNumber(inputScale === 'physical' ? observedRange.min : observedRange.min / 200, 4)}–${formatNumber(inputScale === 'physical' ? observedRange.max : observedRange.max / 200, 4)} ${inputScale === 'physical' ? observedRange.unit : '(đã chia 200)'}. Nhập số dương; ngoài miền vẫn có thể gửi để kiểm tra OOD.`
+                        : 'Nhập số dương; ngoài miền vẫn có thể gửi để kiểm tra OOD.'}
+                    </small>
                   </label>
-                ))}
+                  )
+                })}
               </div>
 
-              <button type="submit" className="primary-button submit-button" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <LoaderCircle size={18} className="spinner" />
-                    Đang dự đoán...
-                  </>
-                ) : (
-                  'Dự đoán tuổi'
-                )}
-              </button>
+              <div className="form-actions">
+                <button type="submit" className="primary-button submit-button" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <LoaderCircle size={18} className="spinner" />
+                      Đang dự đoán...
+                    </>
+                  ) : (
+                    'Dự đoán tuổi'
+                  )}
+                </button>
+                <button type="button" className="preset-button reset-button" onClick={resetPrediction}>
+                  Đặt lại
+                </button>
+              </div>
             </form>
           </section>
 
@@ -507,7 +830,9 @@ function App() {
             {prediction ? (
               <>
                 <div className="result-badges">
-                  <span className={`badge ${prediction.age_group.toLowerCase()}`}>{prediction.age_group}</span>
+                  <span className={`badge ${prediction.age_group.toLowerCase()}`}>
+                    Nhóm theo Rings dự đoán: {prediction.age_group}
+                  </span>
                   {prediction.is_out_of_distribution ? (
                     <span className="badge warn"><ShieldAlert size={14} /> Ngoài miền dữ liệu</span>
                   ) : (
@@ -527,7 +852,7 @@ function App() {
                 </div>
 
                 <div className="interval-box">
-                  <div className="interval-title">Khoảng tham chiếu láng giềng</div>
+                  <div className="interval-title">Khoảng giá trị trong nhóm láng giềng</div>
                   <div className="interval-grid">
                     <div>
                       <span>Min</span>
@@ -542,23 +867,48 @@ function App() {
                       <strong>{formatNumber(prediction.reference_interval.max_rings, 2)}</strong>
                     </div>
                   </div>
+                  <p className="result-explainer">
+                    Min, median và max Rings của nearest neighbors do API trả về. Đây là khoảng tham chiếu,
+                    không phải khoảng tin cậy 95%.
+                  </p>
                 </div>
 
-                {prediction.warnings.length > 0 ? (
-                  <div className="warning-list">
-                    {prediction.warnings.map((warning) => (
-                      <div key={warning} className="warning-item">
-                        <ShieldAlert size={14} />
-                        {warning}
-                      </div>
-                    ))}
-                  </div>
+                {prediction.is_out_of_distribution || prediction.warnings.length > 0 ? (
+                  <details className="ood-summary" open={prediction.is_out_of_distribution}>
+                    <summary>
+                      <ShieldAlert size={16} />
+                      Cảnh báo dữ liệu ngoài miền ({prediction.warnings.length})
+                    </summary>
+                    {prediction.warnings.length > 0 ? (
+                      <>
+                        <ul>
+                          {prediction.warnings.map((warning) => {
+                            const formatted = formatOodWarning(warning)
+                            return <li key={warning}>{formatted.message}</li>
+                          })}
+                        </ul>
+                        {prediction.warnings.some((warning) => formatOodWarning(warning).usesNormalizedValues) ? (
+                          <p className="ood-unit-note">
+                            Các giá trị trong cảnh báo được API tính trên payload thang UCI đã chia 200.
+                            Đơn vị vật lý tương ứng được quy đổi bằng cách nhân 200 (mm cho kích thước, g cho khối lượng).
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p>API đánh dấu mẫu ngoài miền nhưng không trả về nội dung cảnh báo chi tiết.</p>
+                    )}
+                  </details>
                 ) : null}
 
                 <div className="neighbors-wrap">
-                  <h3>Láng giềng gần nhất</h3>
+                  <h3>Nearest neighbors · {prediction.nearest_neighbors.length} mẫu trả về</h3>
+                  <p className="chart-caption">
+                    Đây là các mẫu huấn luyện gần nhất theo khoảng cách của pipeline, không phải mẫu test.
+                  </p>
                   <div className="neighbor-list">
-                    {prediction.nearest_neighbors.map((neighbor, index) => (
+                    {prediction.nearest_neighbors
+                      .slice(0, showAllNeighbors ? prediction.nearest_neighbors.length : 5)
+                      .map((neighbor, index) => (
                       <div className="neighbor-item" key={`${neighbor.rings}-${index}`}>
                         <div className="neighbor-head">
                           <span>NN {index + 1}</span>
@@ -570,6 +920,15 @@ function App() {
                       </div>
                     ))}
                   </div>
+                  {prediction.nearest_neighbors.length > 5 ? (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setShowAllNeighbors((shown) => !shown)}
+                    >
+                      {showAllNeighbors ? 'Thu gọn còn 5 mẫu' : `Xem đầy đủ ${prediction.nearest_neighbors.length} mẫu`}
+                    </button>
+                  ) : null}
                 </div>
               </>
             ) : (
@@ -583,84 +942,312 @@ function App() {
 
       {activeView === 'model' ? (
         <main className="page-section model-page">
-          <section className="panel chart-panel">
+          <section className="panel section-card experiment-card">
+            <div className="section-header">
+              <Gauge size={18} />
+              <h2>Hiệu năng mô hình đang được API phục vụ</h2>
+            </div>
+            <div className="model-kpis">
+              <MetricCard
+                label="MAE · Test"
+                value={modelCard ? formatNumber(modelCard.performance_metrics.Test_MAE, 4) : '—'}
+                hint="Rings · sai số tuyệt đối trung bình"
+                icon={<Target size={18} />}
+                tone="primary"
+              />
+              <MetricCard
+                label="RMSE · Test"
+                value={modelCard ? formatNumber(modelCard.performance_metrics.Test_RMSE, 4) : '—'}
+                hint="Rings · nhạy hơn với sai số lớn"
+                icon={<Activity size={18} />}
+                tone="success"
+              />
+              <MetricCard
+                label="R² · Test"
+                value={modelCard ? formatNumber(modelCard.performance_metrics.Test_R2, 4) : '—'}
+                hint="Không có đơn vị · mức độ giải thích biến thiên"
+                icon={<BarChart3 size={18} />}
+              />
+            </div>
+            <div className="metric-glossary" aria-label="Giải thích metric">
+              <p><strong>MAE:</strong> trung bình |Rings thật − Rings dự đoán|, đơn vị vòng; thấp hơn thường tốt hơn.</p>
+              <p><strong>RMSE:</strong> căn trung bình bình phương sai số, đơn vị vòng; sai số lớn ảnh hưởng mạnh hơn.</p>
+              <p><strong>R²:</strong> hệ số xác định, không có đơn vị; có thể âm khi mô hình kém hơn baseline trung bình trên test.</p>
+              <p><strong>Median Baseline:</strong> dùng trung vị Rings của Train làm hằng số dự đoán các mẫu Test.</p>
+            </div>
+            <p className="chart-caption">
+              {modelCard
+                ? `Giá trị lấy trực tiếp từ GET /api/model-card; cấu hình runtime K=${modelCard.hyperparameters.n_neighbors}, weights=${modelCard.hyperparameters.weights}.`
+                : 'Chưa xác minh được metric và cấu hình runtime vì API đang ngoại tuyến.'}
+            </p>
+            {modelCard && evaluationReports && !apiMatchesReport ? (
+              <div className="notice-box">
+                Runtime API hiện không khớp metadata/bảng kết quả đã lưu trong repository. KPI trên
+              vẫn là dữ liệu API; các biểu đồ bên dưới là artifact tĩnh, không đồng nhất với
+              cấu hình API hiện tại.
+              </div>
+            ) : null}
+          </section>
+
+          <section className="panel chart-panel experiment-card baseline-experiment">
             <div className="section-header">
               <BarChart3 size={18} />
-              <h2>Hiệu năng mô hình</h2>
+              <h2>Thí nghiệm 1 · Median Baseline và KNN</h2>
             </div>
-
-            {modelCard ? (
-              <div className="chart-box">
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={metricsChartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                      {metricsChartData.map((entry, index) => (
-                        <Cell key={entry.name} fill={metricColors[index % metricColors.length]} />
+            {evaluationReports ? (
+              <>
+                <div className="baseline-chart-scroll">
+                  <div className="chart-box baseline-chart">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={evaluationReports.modelResults} margin={{ top: 12, right: 18, left: 4, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="model" tick={{ fontSize: 12 }} />
+                        <YAxis label={{ value: 'MAE (Rings)', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip formatter={(value) => [`${Number(value).toFixed(4)} Rings`, 'MAE · Test']} />
+                        <Bar dataKey="mae" name="MAE · Test" fill="#1f7ae0" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="baseline-results-scroll">
+                  <table className="baseline-results-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Mô hình</th>
+                        <th scope="col">MAE · Test (Rings)</th>
+                        <th scope="col">RMSE · Test (Rings)</th>
+                        <th scope="col">R² · Test</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {evaluationReports.modelResults.map((row) => (
+                        <tr key={row.model}>
+                          <th scope="row">{row.model}</th>
+                          <td>{formatNumber(row.mae, 4)}</td>
+                          <td>{formatNumber(row.rmse, 4)}</td>
+                          <td>{formatNumber(row.r2, 4)}</td>
+                        </tr>
                       ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="empty-state">Đang tải thống kê hiệu năng…</div>
-            )}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="insight">
+                  <strong>Nhận xét kết quả.</strong> Trên test set, các KNN trong artifact có MAE thấp hơn
+                  Median Baseline. Bảng phân biệt rõ KNN không scale và StandardScaler; cấu hình API
+                  hiện tại chỉ được xác nhận khi API khớp artifact.
+                </p>
+                <p className="source-note">Nguồn: {evaluationReports.sources.modelResults}. Metric đánh giá trên test set độc lập.</p>
+              </>
+            ) : <div className="empty-state">{reportsLoading ? 'Đang tải artifact thực nghiệm…' : reportsError}</div>}
           </section>
 
-          <section className="panel chart-panel">
+          <section className="panel chart-panel experiment-card">
+            <div className="section-header">
+              <Scale size={18} />
+              <h2>Thí nghiệm 2 · StandardScaler và No Scaling</h2>
+            </div>
+            {evaluationReports ? (
+              <>
+                <div className="chart-box">
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={evaluationReports.cvAblation} margin={{ top: 12, right: 18, left: 4, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="preprocessing" />
+                      <YAxis label={{ value: 'CV MAE (Rings)', angle: -90, position: 'insideLeft' }} />
+                      <Tooltip formatter={(value) => [`${Number(value).toFixed(4)} Rings`, 'CV MAE · Train']} />
+                      <Bar dataKey="cvMae" name="CV MAE · Train" fill="#25a9c3" radius={[8, 8, 0, 0]}>
+                        <ErrorBar dataKey="cvStd" width={8} stroke="#0b2a42" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="ablation-grid">
+                  {evaluationReports.cvAblation.map((row) => (
+                    <div className="detail-block" key={row.preprocessing}>
+                      <span className="detail-label">{row.preprocessing} · CV trên Train</span>
+                      <strong>MAE {formatNumber(row.cvMae, 4)} ± {formatNumber(row.cvStd, 4)}</strong>
+                      <span className="detail-subtext">Selected K = {row.bestK} · weights = {row.bestWeights}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="insight">
+                  <strong>Nhận xét kết quả.</strong> Trong artifact hiện tại, No Scaling có CV MAE thấp
+                  hơn StandardScaler; kết quả này không có nghĩa scaling luôn tốt hơn. Đây là kết quả
+                  cross-validation trên train, không phải metric test. Model API đang load StandardScaler
+                  với cấu hình riêng hiển thị ở KPI phía trên.
+                </p>
+                <div className="notice-box">
+                  Mã pipeline gọi chọn cấu hình với <code>force_scaling=True</code>; vì vậy cấu hình cuối
+                  được chọn trong nhánh StandardScaler dù No Scaling có CV MAE thấp hơn ở bảng hiện tại.
+                  Artifact không ghi rõ lý do phương pháp cho lựa chọn này; cần nhóm Model xác nhận nếu được hỏi.
+                </div>
+                <p className="source-note">Nguồn: {evaluationReports.sources.cvAblation}. Sai số hiển thị là CV_STD qua các fold.</p>
+              </>
+            ) : <div className="empty-state">{reportsLoading ? 'Đang tải artifact thực nghiệm…' : reportsError}</div>}
+          </section>
+
+          <section className="panel chart-panel experiment-card">
             <div className="section-header">
               <Activity size={18} />
-              <h2>MAE theo nhóm tuổi</h2>
+              <h2>Thí nghiệm 3 · CV MAE theo K</h2>
             </div>
-
-            {modelCard ? (
-              <div className="chart-box">
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={ageGroupChartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]} fill="#1d6ad8" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="empty-state">Đang tải dữ liệu nhóm tuổi…</div>
-            )}
+            {evaluationReports ? (
+              <>
+                <div className="chart-box tall-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={cvChartData} margin={{ top: 14, right: 18, left: 12, bottom: 28 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="k" type="number" domain={['dataMin', 'dataMax']} allowDecimals={false} tickMargin={8} />
+                    <YAxis label={{ value: 'CV MAE (Rings)', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip labelFormatter={(value) => `K = ${value}`} formatter={(value, name) => [`${Number(value).toFixed(4)} Rings`, name]} />
+                    <Line type="monotone" dataKey="scaled_uniform" name="StandardScaler · uniform" stroke={cvLineColors.scaled_uniform} dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="scaled_distance" name="StandardScaler · distance" stroke={cvLineColors.scaled_distance} dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="unscaled_uniform" name="No Scaling · uniform" stroke={cvLineColors.unscaled_uniform} dot={false} connectNulls={false} />
+                      <Line type="monotone" dataKey="unscaled_distance" name="No Scaling · distance" stroke={cvLineColors.unscaled_distance} dot={false} connectNulls={false} />
+                      {selectedCvResult ? (
+                        <ReferenceDot
+                          x={selectedCvResult.k}
+                          y={selectedCvResult.mae}
+                          r={7}
+                          fill="#061b2b"
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          label={{ value: `${modelCard ? 'API' : 'Artifact'} K=${selectedCvResult.k}`, position: 'top', fill: '#061b2b', fontSize: 12 }}
+                        />
+                      ) : null}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="cv-axis-caption">Số hàng xóm K</div>
+                <div className="cv-legend" aria-label="Chú giải CV MAE">
+                  <span><i style={{ backgroundColor: cvLineColors.scaled_uniform }} />StandardScaler · uniform</span>
+                  <span><i style={{ backgroundColor: cvLineColors.scaled_distance }} />StandardScaler · distance</span>
+                  <span><i style={{ backgroundColor: cvLineColors.unscaled_uniform }} />No Scaling · uniform</span>
+                  <span><i style={{ backgroundColor: cvLineColors.unscaled_distance }} />No Scaling · distance</span>
+                  {selectedCvResult ? <span><i className="selected-marker" />Cấu hình {modelCard ? 'API runtime' : 'metadata artifact'} được chọn</span> : null}
+                </div>
+                <p className="insight">
+                  <strong>Nhận xét kết quả.</strong> Mỗi đường biểu diễn một tổ hợp preprocessing và
+                  weights từ CV thực. Chấm đậm là điểm CV tương ứng K/weights/scaling của API hiện tại
+                  khi cấu hình đó có trong CSV; không nội suy hoặc tự điền các điểm thiếu.
+                </p>
+                <p className="source-note">Nguồn: {evaluationReports.sources.cvResults}. Từng điểm là MAE cross-validation trên train.</p>
+              </>
+            ) : <div className="empty-state">{reportsLoading ? 'Đang tải artifact thực nghiệm…' : reportsError}</div>}
           </section>
 
-          <section className="panel section-card">
+          <section className="panel chart-panel experiment-card">
+            <div className="section-header">
+              <Target size={18} />
+              <h2>Thí nghiệm 4 · Sai số theo nhóm tuổi</h2>
+            </div>
+            {evaluationReports ? (
+              <>
+                <div className="chart-box">
+                  <ResponsiveContainer width="100%" height={290}>
+                    <BarChart data={evaluationReports.ageGroupMae} margin={{ top: 12, right: 18, left: 4, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="group" />
+                      <YAxis label={{ value: 'MAE (Rings)', angle: -90, position: 'insideLeft' }} />
+                      <Tooltip formatter={(value) => [`${Number(value).toFixed(4)} Rings`, 'MAE · Test']} />
+                      <Bar dataKey="mae" name="MAE · Test" fill="#1f7ae0" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="chart-caption">
+                  {evaluationReports.ageGroupMae.map((row) => `${row.group}: MAE ${formatNumber(row.mae, 4)} Rings`).join(' · ')}
+                  {' · '}Số mẫu theo nhóm không có trong artifact.
+                </p>
+                <p className="insight">
+                  <strong>Nhận xét kết quả.</strong> Nhóm được xác định theo Rings thực tế của mẫu trên
+                  tập test (Young ≤ 8, Middle 9–12, Old &gt; 12). Đây là phân tích sai số của Regression,
+                  không phải mô hình Classification; số lượng mẫu mỗi nhóm không được suy đoán.
+                </p>
+                <p className="source-note">Nguồn: {evaluationReports.sources.ageGroupMae}; quy tắc nhóm trong src/evaluate.py.</p>
+              </>
+            ) : <div className="empty-state">{reportsLoading ? 'Đang tải artifact thực nghiệm…' : reportsError}</div>}
+          </section>
+
+          <section className="panel chart-panel experiment-card">
+            <div className="section-header">
+              <Activity size={18} />
+              <h2>Residual · Actual Rings và sai số</h2>
+            </div>
+            {evaluationReports ? (
+              <>
+                <figure className="residual-figure">
+                  <img
+                    src="/model-reports/residual_plot.png"
+                    alt="Biểu đồ residual trên test set, trục ngang Actual Rings và trục dọc Residual (Actual trừ Predicted), có đường tham chiếu tại 0."
+                  />
+                  <figcaption>Ảnh residual gốc xuất từ quy trình đánh giá của dự án.</figcaption>
+                </figure>
+                <p className="chart-caption">
+                  Residual = actual − predicted. Đường ngang màu đỏ biểu thị residual = 0; điểm phía
+                  trên biểu thị dự đoán thấp hơn thực tế, phía dưới biểu thị dự đoán cao hơn.
+                </p>
+                <p className="insight">
+                  <strong>Nhận xét kết quả.</strong> Phân bố residual quanh đường 0 giúp quan sát xu
+                  hướng lệch và sai số lớn theo Rings thực tế. Giao diện dùng ảnh artifact gốc vì repo
+                  không cung cấp bảng actual/predicted theo từng mẫu để dựng lại scatter.
+                </p>
+                <p className="source-note">Nguồn: {evaluationReports.sources.residualPlot}; ảnh được tạo bởi src/evaluate.py trên test set.</p>
+              </>
+            ) : <div className="empty-state">{reportsLoading ? 'Đang tải artifact thực nghiệm…' : reportsError}</div>}
+          </section>
+
+          <section className="panel section-card experiment-card">
             <div className="section-header">
               <Database size={18} />
-              <h2>Thông tin mô hình</h2>
+              <h2>Model Card</h2>
             </div>
-
             {modelCard ? (
-              <div className="model-details">
-                <div className="detail-block">
-                  <span className="detail-label">Thuật toán</span>
-                  <strong>{modelCard.algorithm}</strong>
+              <>
+                <div className="model-details">
+                  <div className="detail-block"><span className="detail-label">Algorithm</span><strong>{modelCard.algorithm}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Cấu hình runtime</span><strong>K = {String(modelCard.hyperparameters.n_neighbors)} · weights = {String(modelCard.hyperparameters.weights)}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Distance metric</span><strong>{String(modelCard.hyperparameters.metric)}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Preprocessing</span><strong>{modelCard.pipeline_steps.join(' → ')}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Train / test</span><strong>{evaluationReports ? `${evaluationReports.metadata.totalTrainingSamples.toLocaleString('vi-VN')} / ${evaluationReports.metadata.totalTestSamples.toLocaleString('vi-VN')} mẫu` : '—'}</strong></div>
+                  <div className="detail-block"><span className="detail-label">CV folds · random_state</span><strong>{String(modelCard.hyperparameters.cv_folds ?? '—')} · {String(modelCard.hyperparameters.random_state ?? '—')}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Intended use</span><strong>{modelCard.intended_use}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Dataset source</span><strong>{modelCard.dataset_source}</strong></div>
                 </div>
-                <div className="detail-block">
-                  <span className="detail-label">Nguồn dữ liệu</span>
-                  <strong>{modelCard.dataset_source}</strong>
+                <div className="limitations-list">
+                  <h3>Giới hạn</h3>
+                  <ul>{safeLimitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
                 </div>
-                <div className="detail-block">
-                  <span className="detail-label">K</span>
-                  <strong>{String(modelCard.hyperparameters.n_neighbors)}</strong>
+                <div className="technical-glossary">
+                  <p><strong>StandardScaler:</strong> chuẩn hóa 7 biến liên tục; <strong>OneHotEncoder:</strong> mã hóa Sex dạng phân loại.</p>
+                  <p><strong>weights=distance:</strong> láng giềng gần hơn đóng góp trọng số lớn hơn trong dự đoán; distance metric là Euclidean (Minkowski p=2).</p>
+                  <p><strong>5-fold CV:</strong> đánh giá cấu hình bằng các fold tách từ Train; Test được giữ riêng cho đánh giá cuối.</p>
                 </div>
-                <div className="detail-block">
-                  <span className="detail-label">Weights</span>
-                  <strong>{String(modelCard.hyperparameters.weights)}</strong>
+              </>
+            ) : evaluationReports ? (
+              <>
+                <div className="notice-box">
+                  API ngoại tuyến: dưới đây là metadata của artifact trên đĩa, không thể xác nhận đây là
+                  cấu hình mà server đang load.
                 </div>
-              </div>
-            ) : (
-              <div className="empty-state">Đang tải metadata mô hình…</div>
-            )}
+                <div className="model-details">
+                  <div className="detail-block"><span className="detail-label">Algorithm</span><strong>{evaluationReports.metadata.pipelineSteps.at(-1)}</strong></div>
+                  <div className="detail-block"><span className="detail-label">K · weights · metric</span><strong>{String(evaluationReports.metadata.hyperparameters.n_neighbors)} · {String(evaluationReports.metadata.hyperparameters.weights)} · {String(evaluationReports.metadata.hyperparameters.metric)}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Preprocessing</span><strong>{evaluationReports.metadata.pipelineSteps.join(' → ')}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Train / test · CV · seed</span><strong>{evaluationReports.metadata.totalTrainingSamples} / {evaluationReports.metadata.totalTestSamples} · {String(evaluationReports.metadata.hyperparameters.cv_folds)} folds · {String(evaluationReports.metadata.hyperparameters.random_state)}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Intended use</span><strong>{evaluationReports.metadata.intendedUse}</strong></div>
+                  <div className="detail-block"><span className="detail-label">Dataset source</span><strong>{evaluationReports.metadata.datasetSource}</strong></div>
+                </div>
+                <div className="limitations-list">
+                  <h3>Giới hạn</h3>
+                  <ul>{safeLimitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
+                </div>
+                <div className="technical-glossary">
+                  <p><strong>StandardScaler:</strong> chuẩn hóa 7 biến liên tục; <strong>OneHotEncoder:</strong> mã hóa Sex dạng phân loại.</p>
+                  <p><strong>weights=distance:</strong> láng giềng gần hơn đóng góp trọng số lớn hơn trong dự đoán; distance metric là Euclidean (Minkowski p=2).</p>
+                  <p><strong>5-fold CV:</strong> đánh giá cấu hình bằng các fold tách từ Train; Test được giữ riêng cho đánh giá cuối.</p>
+                </div>
+              </>
+            ) : <div className="empty-state">{reportsLoading ? 'Đang tải metadata…' : reportsError}</div>}
           </section>
 
           <section className="panel section-card">
@@ -674,21 +1261,22 @@ function App() {
                 <table className="range-table">
                   <thead>
                     <tr>
-                      <th>Biến</th>
-                      <th>Min</th>
-                      <th>Mean</th>
-                      <th>Max</th>
-                      <th>Đơn vị</th>
+                      <th>Đặc trưng</th>
+                      <th>Ý nghĩa</th>
+                      <th>Miền quan sát Train</th>
                     </tr>
                   </thead>
                   <tbody>
+                    <tr>
+                      <td>Sex</td>
+                      <td>{featureDescriptions.Sex}</td>
+                      <td>{featureRanges?.valid_sex_values.join(' · ') ?? 'M · F · I'} · phân loại</td>
+                    </tr>
                     {featureEntries.map(([feature, stats]) => (
                       <tr key={feature}>
                         <td>{feature}</td>
-                        <td>{formatNumber(stats.min, 3)}</td>
-                        <td>{formatNumber(stats.mean, 3)}</td>
-                        <td>{formatNumber(stats.max, 3)}</td>
-                        <td>{stats.unit}</td>
+                        <td>{featureDescriptions[feature]}</td>
+                        <td>{formatNumber(stats.physical_min, 2)}–{formatNumber(stats.physical_max, 2)} {stats.physical_unit}</td>
                       </tr>
                     ))}
                   </tbody>
