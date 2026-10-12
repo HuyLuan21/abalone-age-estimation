@@ -837,7 +837,7 @@ function App() {
                 </div>
 
                 <div className="interval-box">
-                  <div className="interval-title">Khoảng giá trị trong nhóm láng giềng</div>
+                  <div className="interval-title">Khoảng tham chiếu từ K láng giềng gần nhất</div>
                   <div className="interval-grid">
                     <div>
                       <span>Min</span>
@@ -853,8 +853,8 @@ function App() {
                     </div>
                   </div>
                   <p className="result-explainer">
-                    Min, median và max Rings của nearest neighbors do API trả về. Đây là khoảng tham chiếu,
-                    không phải khoảng tin cậy 95%.
+                    Min, median và max Rings của nhóm K láng giềng gần nhất do API trả về. Đây là khoảng tham chiếu
+                    mô tả các mẫu tương tự quan sát được, không phải khoảng tin cậy thống kê đã hiệu chuẩn và không bảo đảm chứa tuổi thật của cá thể mới.
                   </p>
                 </div>
 

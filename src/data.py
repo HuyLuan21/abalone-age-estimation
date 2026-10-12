@@ -89,6 +89,19 @@ def clean_anomalies(
         reasons.append(KNOWN_ANOMALIES_METADATA.get(idx, "Physical inconsistency or biological impossibility."))
     df_anomalies["Anomaly_Reason"] = reasons
 
+    # Safety check on standard UCI dataset (4,177 rows): Ensure exactly the 4 expected physical anomalies are isolated
+    if len(df) == 4177:
+        detected_indices = set(df_anomalies.index)
+        expected_indices = set(KNOWN_ANOMALIES_METADATA.keys())
+        if detected_indices != expected_indices:
+            unexpected = detected_indices - expected_indices
+            if unexpected:
+                import warnings
+                warnings.warn(
+                    f"clean_anomalies: Phát hiện thêm quan sát dị biệt ngoài 4 mẫu đã kiểm toán trước ({unexpected}).",
+                    UserWarning,
+                )
+
     if audit_report_path:
         os.makedirs(os.path.dirname(audit_report_path), exist_ok=True)
         df_anomalies.to_csv(audit_report_path, index=True, index_label="Raw_Row_Index")

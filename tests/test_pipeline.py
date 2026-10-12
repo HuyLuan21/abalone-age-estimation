@@ -160,25 +160,44 @@ def test_metadata_consistency():
 def test_held_out_test_evaluation_protocol():
     """Verify that Test metrics are strictly reserved for the locked primary model and baseline.
 
-    Ablation candidate models must remain un-evaluated on Test (NaN/null) to prevent multiple
-    hypothesis testing and data leakage on the held-out partition.
+    All eliminated candidate models must remain un-evaluated on Test (NaN/empty) to prevent
+    data leakage and multiple hypothesis testing on the held-out partition.
+    Also verifies that the final serving pipeline was refitted on the combined Train + Validation data.
     """
     results_path = "reports/model_results.csv"
-    if os.path.exists(results_path):
-        df_res = pd.read_csv(results_path)
-        # Identify rows for candidate models
-        ablation_rows = df_res[df_res["Model"].str.contains("Ablation Candidate|StandardScaler", case=False, na=False)]
-        for _, row in ablation_rows.iterrows():
-            if "Ablation Candidate" in str(row.get("Selection_Stage", "")):
-                assert pd.isna(row["Test_MAE"]), "Ablation candidate model must NOT have Test_MAE evaluated!"
-                assert pd.isna(row["Test_R2"]), "Ablation candidate model must NOT have Test_R2 evaluated!"
+    assert os.path.exists(results_path), f"Results table missing at {results_path}"
 
-        # Identify locked and refitted model
-        locked_rows = df_res[df_res["Model"].str.contains("Locked Final Model|Selected & Locked|Refitted", case=False, na=False)]
-        assert len(locked_rows) >= 1, "Must contain locked/refitted model row in results"
-        for _, row in locked_rows.iterrows():
-            assert not pd.isna(row["Test_MAE"]), "Locked model must have valid Test_MAE!"
-            assert row["Test_MAE"] > 0, "Test_MAE must be positive"
+    df_res = pd.read_csv(results_path)
+
+    # 1. Eliminated models must NOT have Test metrics evaluated (must be NaN)
+    eliminated_rows = df_res[
+        df_res["Selection_Stage"].str.contains("Eliminated", case=False, na=False)
+        | df_res["Model"].str.contains("Eliminated", case=False, na=False)
+    ]
+    assert len(eliminated_rows) >= 1, "Must contain at least one eliminated candidate row in results"
+    for _, row in eliminated_rows.iterrows():
+        assert pd.isna(row["Test_MAE"]), f"Eliminated model '{row['Model']}' must NOT have Test_MAE evaluated!"
+        assert pd.isna(row["Test_RMSE"]), f"Eliminated model '{row['Model']}' must NOT have Test_RMSE evaluated!"
+        assert pd.isna(row["Test_R2"]), f"Eliminated model '{row['Model']}' must NOT have Test_R2 evaluated!"
+
+    # 2. Selected model and Baseline MUST have valid Test metrics
+    active_rows = df_res[
+        df_res["Selection_Stage"].str.contains("Selected|Benchmark", case=False, na=False)
+    ]
+    assert len(active_rows) >= 2, "Must contain at least Baseline and Selected model rows"
+    for _, row in active_rows.iterrows():
+        assert not pd.isna(row["Test_MAE"]), f"Active model '{row['Model']}' must have valid Test_MAE!"
+        assert float(row["Test_MAE"]) > 0, "Test_MAE must be positive"
+
+    # 3. Verify final model was refitted on Train + Validation (85% ~ 3547 samples)
+    artifact_path = "models/abalone_knn_pipeline.pkl"
+    assert os.path.exists(artifact_path), f"Model artifact missing at {artifact_path}"
+    pipe = joblib.load(artifact_path)
+    knn_estimator = pipe.named_steps["knn"]
+    assert hasattr(knn_estimator, "_y"), "KNN estimator must have _y attribute containing fitted targets"
+    assert len(knn_estimator._y) == 3547, (
+        f"Final model must be refitted on 3547 samples (Train+Val 85%), found {len(knn_estimator._y)}"
+    )
 
 
 def test_model_locking_precedence_over_test_evaluation():

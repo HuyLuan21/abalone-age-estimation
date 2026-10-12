@@ -114,14 +114,13 @@
 
 | Mô hình | Huấn luyện trên | Test MAE (vòng) | Test RMSE (vòng) | Test $R^2$ | Mức độ cải thiện |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Median Baseline** | 85% Train + Val | 2.5655 | 3.6592 | -0.0992 | Mốc ngây thơ |
-| **KNN (chưa Refit)** | 70% Train | 1.5063 | 2.2778 | 0.5741 | Giảm 41.3% MAE |
-| **KNN (Đã Refit)** | **85% Train + Val** | **1.5018** | **2.2567** | **0.5820** | **Giảm 41.5% MAE, R² tăng lên 58.2%** |
+| **Median Baseline** | 85% Train + Val | 2.5655 | 3.6592 | -0.0992 | Mốc ngây thơ (Naive Benchmark) |
+| **KNN - No Scale (Đã Khóa & Refit)** | **85% Train + Val** | **1.5018** | **2.2567** | **0.5820** | **Giảm 41.5% MAE, R² đạt 58.2%** |
 
-* *(Chèn hình ảnh so sánh: [`reports/figures/actual_vs_predicted.png`](file:///c:/Users/Admin/source/repos/ML/abalone-age-estimation/reports/figures/actual_vs_predicted.png) và [`reports/figures/residual_plot.png`](file:///c:/Users/Admin/source/repos/ML/abalone-age-estimation/reports/figures/residual_plot.png))*
+* *(Chèn hình ảnh trực quan: [`reports/figures/actual_vs_predicted.png`](file:///c:/Users/Admin/source/repos/ML/abalone-age-estimation/reports/figures/actual_vs_predicted.png) và [`reports/figures/residual_plot.png`](file:///c:/Users/Admin/source/repos/ML/abalone-age-estimation/reports/figures/residual_plot.png))*
 * **Kết luận thực nghiệm:**
-  * Mô hình k-NN vượt trội hoàn toàn Baseline, giảm hơn $1.06$ vòng sai số tuyệt đối trung bình.
-  * Việc áp dụng bước **Refit trên 85% dữ liệu** đã giúp cải thiện đồng thời cả MAE, RMSE và nâng hệ số giải thích $R^2$ lên mức $58.2\%$.
+  * Mô hình k-NN tối ưu vượt trội hoàn toàn Baseline, giảm hơn $1.06$ vòng sai số tuyệt đối trung bình và nâng hệ số giải thích $R^2$ lên $58.2\%$.
+  * Toàn bộ cấu hình siêu tham số ($K=17$, `weights='distance'`, `No Scale`) được đóng băng từ vòng Validation; tập Test được giữ độc lập và chỉ dùng để đưa ra kết luận cuối cùng.
 
 > 🎙️ **Speaker Notes:**
 > *"Khi mở tập Test độc lập lần duy nhất, mô hình k-NN sau khi refit trên 85% dữ liệu đạt Test MAE là 1.5018 vòng, giảm hơn 41% sai số so với Baseline. Đồ thị Actual vs Predicted cho thấy các điểm dự đoán bám rất sát đường lý tưởng y=x ở vùng tuổi từ 6 đến 12."*
@@ -150,7 +149,7 @@
   * **Tách biệt Serving & Training:** API chỉ nạp artifact `.pkl` đã lưu, suy luận siêu tốc (< 10ms/request), không huấn luyện lại lúc runtime.
 * **Các tính năng nổi bật đáp ứng Rubric:**
   1. **Hỗ trợ 2 hệ đơn vị:** Nhập theo chuẩn UCI ($0.455$) hoặc mm/gam thực tế ($91.0\text{ mm}$), tự động quy đổi hai chiều.
-  2. **Giải thích bằng láng giềng (Explainability):** Trả về danh sách $K$ cá thể láng giềng gần nhất kèm khoảng tin cậy tham chiếu (Min/Max/Median).
+  2. **Giải thích bằng láng giềng (Explainability):** Trả về danh sách $K$ cá thể láng giềng gần nhất kèm khoảng tham chiếu tương đồng sinh học (Min/Max/Median).
   3. **Bộ lọc phát hiện mẫu ngoài miền (OOD Guardrail):** Cảnh báo khi người dùng nhập dữ liệu phi lý (ví dụ: Thịt + Vỏ > Khối lượng toàn phần; Đường kính > Chiều dài; Chiều cao $\le 0$).
 
 > 🎙️ **Speaker Notes:**

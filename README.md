@@ -97,7 +97,7 @@ python run_server.py
 Hệ thống sẽ tự động khởi tạo backend FastAPI và phục vụ giao diện Web React đã biên dịch:
 * **Giao diện Web ứng dụng (Frontend):** [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
   * **Tab 1: Giới thiệu & Phạm vi** (Mục tiêu sinh học, quy chuẩn bài toán, bản quyền dữ liệu).
-  * **Tab 2: Dự đoán & Láng giềng** (Form nhập liệu 2 hệ đơn vị, bảng láng giềng gần nhất, khoảng tin cậy tham chiếu & cảnh báo OOD).
+  * **Tab 2: Dự đoán & Láng giềng** (Form nhập liệu 2 hệ đơn vị, bảng láng giềng gần nhất, khoảng tham chiếu từ K láng giềng & cảnh báo OOD).
   * **Tab 3: Dashboard & Model Card** (3 thí nghiệm bắt buộc, đường cong MAE vs K, phân tích sai số 3 nhóm tuổi, Model Card).
 * **Tài liệu API tương tác (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 * **Tài liệu API (ReDoc):** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
@@ -183,14 +183,14 @@ Sau khi chạy 5-Fold CV trên tập Train (70%), 2 ứng viên đại diện đ
 
 ### 2. Kết quả Đánh giá Cuối cùng trên tập Test độc lập (15% ~ 626 mẫu)
 
-Sau khi khóa cấu hình, cả mô hình k-NN lẫn mô hình Baseline đều được **Refit trên toàn bộ 85% dữ liệu (Train + Validation = 3,547 mẫu)** để đảm bảo so sánh hoàn toàn công bằng về dung lượng dữ liệu học:
+Sau khi khóa cấu hình tại tập Validation, cả mô hình k-NN lẫn mô hình Baseline đều được **Refit trên toàn bộ 85% dữ liệu (Train + Validation = 3,547 mẫu)** để đảm bảo nguyên tắc so sánh hoàn toàn công bằng (*Fair Comparison Protocol*) về dung lượng dữ liệu học trước khi đánh giá trên tập Test độc lập:
 
 | Mô hình | Huấn luyện trên | Test MAE (vòng) | Test RMSE (vòng) | Test $R^2$ | Đánh giá |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Median Baseline** | 85% Train + Val | 2.5655 | 3.6592 | -0.0992 | Mốc ngây thơ |
-| **KNN - No Scale** | **85% Train + Val** | **1.5018** | **2.2567** | **0.5820** | **Vượt trội (giảm 41.5% MAE)** |
+| **Median Baseline** | 85% Train + Val | 2.5655 | 3.6592 | -0.0992 | Mốc ngây thơ (Naive Benchmark) |
+| **KNN - No Scale** | **85% Train + Val** | **1.5018** | **2.2567** | **0.5820** | **Vượt trội (giảm 41.5% MAE so với Baseline)** |
 
-*So sánh với mô hình chỉ fit trên 70% Train cũ:* Việc refit trên 85% dữ liệu đã giúp Test MAE giảm từ `1.5063` xuống **`1.5018`**, Test RMSE giảm từ `2.2778` xuống **`2.2567`**, và $R^2$ tăng từ `0.5741` lên **`0.5820`**.
+*Nhận xét kết quả:* Mô hình k-NN chiến thắng với cấu hình khóa ($K=17$, `weights='distance'`, `No Scale`) đạt hiệu năng vượt trội, giảm hơn $1.06$ vòng sai số tuyệt đối trung bình so với Baseline và giải thích được hơn $58.2\%$ phương sai biến thiên của số vòng trên tập kiểm thử độc lập.
 
 ---
 

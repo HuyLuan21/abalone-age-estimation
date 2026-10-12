@@ -165,13 +165,13 @@ class NeighborInfo(BaseModel):
 
 
 class ReferenceInterval(BaseModel):
-    """Reference interval computed from k nearest neighbors."""
+    """Khoảng tham chiếu số vòng và tuổi tính từ K láng giềng gần nhất (không phải khoảng tin cậy thống kê)."""
 
-    min_rings: float = Field(..., description="Số vòng nhỏ nhất trong nhóm láng giềng")
-    max_rings: float = Field(..., description="Số vòng lớn nhất trong nhóm láng giềng")
-    median_rings: float = Field(..., description="Trung vị số vòng trong nhóm láng giềng")
-    min_age_years: float = Field(..., description="Tuổi nhỏ nhất trong nhóm láng giềng (năm)")
-    max_age_years: float = Field(..., description="Tuổi lớn nhất trong nhóm láng giềng (năm)")
+    min_rings: float = Field(..., description="Số vòng nhỏ nhất trong nhóm K láng giềng gần nhất")
+    max_rings: float = Field(..., description="Số vòng lớn nhất trong nhóm K láng giềng gần nhất")
+    median_rings: float = Field(..., description="Trung vị số vòng trong nhóm K láng giềng gần nhất")
+    min_age_years: float = Field(..., description="Tuổi nhỏ nhất trong nhóm K láng giềng (năm)")
+    max_age_years: float = Field(..., description="Tuổi lớn nhất trong nhóm K láng giềng (năm)")
 
 
 class PredictionResponse(BaseModel):
@@ -186,7 +186,8 @@ class PredictionResponse(BaseModel):
         description="Phân nhóm sinh học: Young (<=8 vòng), Middle (9-12 vòng), Old (>12 vòng)",
     )
     reference_interval: ReferenceInterval = Field(
-        ..., description="Khoảng tham chiếu từ k láng giềng gần nhất"
+        ...,
+        description="Khoảng tham chiếu từ K láng giềng gần nhất (mô tả các mẫu tương đồng quan sát được, không phải khoảng tin cậy thống kê đã hiệu chuẩn)",
     )
     nearest_neighbors: List[NeighborInfo] = Field(
         ..., description="Danh sách các láng giềng gần nhất được tham khảo"
